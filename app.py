@@ -59,6 +59,14 @@ def obtener_colores_multiselect(prop):
         return []
     return []
 
+def obtener_checkbox(prop):
+    try:
+        if prop["type"] == "checkbox":
+            return prop["checkbox"]
+    except:
+        return False
+    return False
+
 st.title("📚 Mi Recomendador de Lectura")
 
 try:
@@ -98,13 +106,13 @@ try:
                         "colores": obtener_colores_multiselect(props.get("Color", {})),
                         "generos": obtener_ids(props.get("Género", {})),
                         "autores_ids": obtener_ids(props.get("Autor", {})),
-                        "es_por_terminar": False
+                        "es_por_terminar": False,
+                        "es_ingles": obtener_checkbox(props.get("Inglés", {}))
                     }
                     
                     nombre_visual = f"{info_libro['titulo']}, de {info_libro['autor_texto']}" if info_libro['autor_texto'] else info_libro['titulo']
                     diccionario_libros[nombre_visual] = info_libro
                     
-                    # Clasificación estricta según tus reglas
                     if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
                         leidos.append(nombre_visual)
                     elif any(k in estado for k in ["por terminar", "leyendo", "en curso", "reading", "retomar"]):
@@ -118,10 +126,7 @@ try:
             else:
                 break
 
-    # El desplegable solo tiene los leídos
     leidos.sort()
-    
-    # Las recomendaciones miran en Por leer (pendientes) + Por terminar
     candidatos = pendientes + por_terminar
     
     st.subheader("🎯 Tu punto de partida")
@@ -131,7 +136,6 @@ try:
     st.markdown("---")
     
     def formato_mensaje(rec):
-        # Si es un libro de "por terminar", usamos la frase especial
         if rec.get("es_por_terminar", False):
             mensaje = f"¿Y si retomas este libro?\n\n**{rec['titulo']}**, de {rec['autor_texto']}."
         else:
@@ -143,7 +147,8 @@ try:
             mensaje += f" \n*Pertenece a {rec['saga_texto']}{num_texto}*"
         return mensaje
 
-    col1, col2, col3 = st.columns(3)
+    # Ahora dividimos en 4 columnas para que quepan todos los botones perfectamente
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         if st.button("🔮 Mismo género", use_container_width=True):
@@ -165,6 +170,12 @@ try:
             opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
             if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("No hay libros con esta paleta.")
+
+    with col4:
+        if st.button("🇬🇧 En Inglés", use_container_width=True):
+            opciones = [p for p in candidatos if p.get("es_ingles", False)]
+            if opciones: st.success(f"Para tu reto de lectura:\n\n{formato_mensaje(random.choice(opciones))}")
+            else: st.warning("No tienes libros pendientes marcados en inglés.")
 
 except Exception as e:
     st.error("❌ Ups, error al cargar.")
