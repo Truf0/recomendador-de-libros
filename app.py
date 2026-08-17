@@ -103,13 +103,11 @@ try:
                     nombre_visual = f"{info_libro['titulo']}, de {info_libro['autor_texto']}" if info_libro['autor_texto'] else info_libro['titulo']
                     diccionario_libros[nombre_visual] = info_libro
                     
-                    # Clasificación exacta según tus categorías
                     if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
                         leidos.append(nombre_visual)
                     elif "por terminar" in estado:
                         por_terminar.append(nombre_visual)
                     elif any(k in estado for k in ["leyendo", "en curso", "reading", "retomar"]):
-                        # Los ignoramos para que no aparezcan en el desplegable
                         pass
                     else:
                         pendientes.append(info_libro)
@@ -119,18 +117,15 @@ try:
             else:
                 break
 
-    # Unimos Leídos + Por terminar para el selector principal
     opciones_selector = leidos + por_terminar
     opciones_selector.sort()
     
     candidatos = pendientes
     
     st.subheader("🎯 Tu punto de partida")
-    libro_elegido = st.selectbox("Selecciona un libro (Leídos o Por terminar):", opciones_selector)
+    libro_elegido = st.selectbox("Último título leído", opciones_selector)
     ref = diccionario_libros[libro_elegido]
     
-    st.markdown("---")
-    st.write(f"Base de recomendación: **{libro_elegido}**.")
     st.markdown("---")
     
     def formato_mensaje(rec):
