@@ -31,7 +31,6 @@ def obtener_ids(prop):
         pass
     return []
 
-# Nueva función para extraer el texto limpio de tus fórmulas de Notion
 def obtener_texto_formula(prop):
     try:
         if prop["type"] == "formula":
@@ -83,12 +82,11 @@ try:
             generos = obtener_ids(props.get("Género", {}))
             autores_ids = obtener_ids(props.get("Autor", {}))
             
-            # Capturamos los nuevos campos de texto
             autor_texto = obtener_texto_formula(props.get("Texto Autor", {}))
             saga_texto = obtener_texto_formula(props.get("Texto Saga", {}))
             
-            # Montamos el nombre bonito para el desplegable
-            nombre_desplegable = f"{titulo} (de {autor_texto})" if autor_texto else titulo
+            # ¡AQUÍ ESTÁ EL CAMBIO! Sin paréntesis y con una coma.
+            nombre_desplegable = f"{titulo}, de {autor_texto}" if autor_texto else titulo
             
             diccionario_libros[nombre_desplegable] = {
                 "titulo": titulo,
@@ -108,7 +106,6 @@ try:
         st.markdown("---")
         st.subheader("🎯 Tu punto de partida")
         
-        # Intentamos encontrar por defecto a Reverte si está en la lista
         indice_defecto = 0
         for i, nombre in enumerate(nombres_para_selector):
             if "La isla de la mujer dormida" in nombre:
