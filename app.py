@@ -7,6 +7,9 @@ st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide"
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
 
+# ... [Mantenemos las mismas funciones: obtener_titulo, obtener_estado, obtener_ids, obtener_texto_formula, obtener_colores_multiselect] ...
+# (He mantenido el código de las funciones igual para que sea más fácil copiar y pegar)
+
 def obtener_titulo(prop):
     try:
         titulo_real = prop["title"][0]["plain_text"]
@@ -40,7 +43,6 @@ def obtener_texto_formula(prop):
         return ""
     return ""
 
-# Nueva función para leer la paleta de 3 colores (Multi-select)
 def obtener_colores_multiselect(prop):
     try:
         if prop["type"] == "multi_select":
@@ -89,8 +91,7 @@ try:
             props = libro["properties"]
             titulo = obtener_titulo(props.get("Título", {}))
             
-            if titulo == "Sin título":
-                continue
+            if titulo == "Sin título": continue
                 
             estado = obtener_estado(props.get("Estado", {}))
             generos = obtener_ids(props.get("Género", {}))
@@ -121,102 +122,64 @@ try:
         st.markdown("---")
         st.subheader("🎯 Tu punto de partida")
         
-        indice_defecto = 0
-        for i, nombre in enumerate(nombres_para_selector):
-            if "La isla de la mujer dormida" in nombre:
-                indice_defecto = i
-                break
-
         libro_elegido = st.selectbox(
             "Selecciona un libro que hayas leído para basar las recomendaciones:", 
-            nombres_para_selector,
-            index=indice_defecto
+            nombres_para_selector
         )
         
         ref = diccionario_libros[libro_elegido]
-        st.write(f"Has elegido **{libro_elegido}**. ¡Vamos a ver qué hay en tu lista de pendientes!")
+        st.write(f"Has elegido **{libro_elegido}**.")
         st.markdown("---")
         
         col1, col2, col3 = st.columns(3)
         
-        # --- EL BOTÓN DE GÉNEROS MEJORADO (MATCH DE ALTA PUREZA) ---
+        # --- LÓGICA DE MENSAJES CON EL NUEVO FORMATO DE SAGA ---
+        def formato_mensaje(rec):
+            mensaje = f"Prueba con **{rec['titulo']}**, de {rec['autor_texto']}."
+            if rec['saga_texto']:
+                # Aquí está el cambio: mensaje limpio
+                mensaje += f" \n*Pertenece a {rec['saga_texto']}*"
+            return mensaje
+
         with col1:
             if st.button("🔮 Mismo género, distinto autor", use_container_width=True):
+                # ... (resto de lógica de géneros igual)
                 generos_ref = set(ref["generos"])
                 autores_ref = set(ref["autores_ids"])
-                
-                # Buscamos coincidencias
-                opciones_puras = []
-                opciones_suaves = []
-                
-                for p in pendientes:
-                    # Que no sea del mismo autor
-                    if not set(p["autores_ids"]).intersection(autores_ref):
-                        generos_p = set(p["generos"])
-                        comunes = generos_ref.intersection(generos_p)
-                        
-                        if len(comunes) >= 2:
-                            opciones_puras.append(p)
-                        elif len(comunes) == 1:
-                            opciones_suaves.append(p)
+                opciones_puras = [p for p in pendientes if not set(p["autores_ids"]).intersection(autores_ref) and len(generos_ref.intersection(set(p["generos"]))) >= 2]
+                opciones_suaves = [p for p in pendientes if not set(p["autores_ids"]).intersection(autores_ref) and len(generos_ref.intersection(set(p["generos"]))) == 1]
                 
                 if opciones_puras:
                     rec = random.choice(opciones_puras)
-                    mensaje = f"🔥 **¡Match de Alta Pureza!** (Coinciden varios géneros).\n\nPrueba con **{rec['titulo']}**, de {rec['autor_texto']}."
-                    if rec['saga_texto']:
-                        mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
-                    st.success(mensaje)
+                    st.success(f"🔥 **¡Match de Alta Pureza!**\n\n{formato_mensaje(rec)}")
                 elif opciones_suaves:
                     rec = random.choice(opciones_suaves)
-                    mensaje = f"✨ **Match Suave** (Coincide 1 género).\n\nPrueba con **{rec['titulo']}**, de {rec['autor_texto']}."
-                    if rec['saga_texto']:
-                        mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
-                    st.success(mensaje)
+                    st.success(f"✨ **Match Suave**\n\n{formato_mensaje(rec)}")
                 else:
-                    st.warning("No tienes libros pendientes que compartan géneros con este y sean de otros autores.")
+                    st.warning("No tienes pendientes de otros autores con estos géneros.")
                     
         with col2:
             if st.button("🔄 Cambio radical", use_container_width=True):
-                opciones = [
-                    p for p in pendientes 
-                    if not any(g in p["generos"] for g in ref["generos"]) 
-                    and not any(a in p["autores_ids"] for a in ref["autores_ids"])
-                ]
+                opciones = [p for p in pendientes if not any(g in p["generos"] for g in ref["generos"]) and not any(a in p["autores_ids"] for a in ref["autores_ids"])]
                 if opciones:
                     rec = random.choice(opciones)
-                    mensaje = f"Rompe con todo leyendo **{rec['titulo']}**, de {rec['autor_texto']}."
-                    if rec['saga_texto']:
-                        mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
-                    st.success(mensaje)
+                    st.success(f"Rompe con todo leyendo:\n\n{formato_mensaje(rec)}")
                 else:
                     st.warning("¡Añade más variedad a tu lista de pendientes!")
                     
-        # --- EL BOTÓN DE COLORES CON PALETAS (COMPARTEN VIBRA VISUAL) ---
         with col3:
             if st.button("🎨 Buscar por Color", use_container_width=True):
                 colores_ref = set(ref.get("colores", []))
-                
                 if not colores_ref:
-                    st.warning("Este libro todavía no ha sido analizado por el robot de colores.")
+                    st.warning("Este libro aún no ha sido analizado por el robot.")
                 else:
-                    # Buscamos libros pendientes que compartan AL MENOS 1 color de la paleta
-                    opciones = [
-                        p for p in pendientes 
-                        if set(p.get("colores", [])).intersection(colores_ref)
-                    ]
-                    
+                    opciones = [p for p in pendientes if set(p.get("colores", [])).intersection(colores_ref)]
                     if opciones:
                         rec = random.choice(opciones)
-                        # Averiguamos qué color o colores coinciden exactamente para decírselo al usuario
                         colores_comunes = list(set(rec['colores']).intersection(colores_ref))
-                        texto_colores = " y ".join(colores_comunes)
-                        
-                        mensaje = f"Comparten tonos de **{texto_colores}**.\n\nSigue la misma estética leyendo **{rec['titulo']}**, de {rec['autor_texto']}."
-                        if rec['saga_texto']:
-                            mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
-                        st.success(mensaje)
+                        st.success(f"Comparten tonos de **{' y '.join(colores_comunes)}**.\n\nSigue la estética leyendo:\n\n{formato_mensaje(rec)}")
                     else:
-                        st.warning("No tienes libros pendientes con portadas que compartan esta paleta.")
+                        st.warning("No tienes pendientes con portadas que compartan esta paleta.")
 
 except Exception as e:
     st.error("❌ Ups, hubo un problema interno.")
