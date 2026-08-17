@@ -9,7 +9,8 @@ DATABASE_ID = st.secrets["database_id"]
 
 def obtener_titulo(prop):
     try:
-        return prop["title"][0]["plain_text"]
+        titulo_real = prop["title"][0]["plain_text"]
+        return titulo_real if titulo_real.strip() else "Sin título"
     except:
         return "Sin título"
 
@@ -78,6 +79,12 @@ try:
         for libro in libros:
             props = libro["properties"]
             titulo = obtener_titulo(props.get("Título", {}))
+            
+            # --- FILTRO ANTIFANTASMAS ---
+            # Si el libro no tiene título, lo ignoramos y pasamos al siguiente
+            if titulo == "Sin título":
+                continue
+                
             estado = obtener_estado(props.get("Estado", {}))
             generos = obtener_ids(props.get("Género", {}))
             autores_ids = obtener_ids(props.get("Autor", {}))
@@ -85,7 +92,6 @@ try:
             autor_texto = obtener_texto_formula(props.get("Texto Autor", {}))
             saga_texto = obtener_texto_formula(props.get("Texto Saga", {}))
             
-            # ¡AQUÍ ESTÁ EL CAMBIO! Sin paréntesis y con una coma.
             nombre_desplegable = f"{titulo}, de {autor_texto}" if autor_texto else titulo
             
             diccionario_libros[nombre_desplegable] = {
