@@ -40,11 +40,18 @@ def obtener_texto_formula(prop):
         return ""
     return ""
 
+# Función que lee el número sea del tipo que sea
 def obtener_numero(prop):
+    if not prop: return None
     try:
-        # Lee si es propiedad de tipo Número o Número de Fórmula
-        if prop["type"] == "number": return prop["number"]
-        if prop["type"] == "formula": return prop["formula"].get("number", None)
+        tipo = prop.get("type")
+        if tipo == "number":
+            return prop.get("number")
+        if tipo == "formula":
+            # Si la fórmula da un número o un texto con el número
+            return prop.get("formula", {}).get("number") or prop.get("formula", {}).get("string")
+        if tipo == "rich_text" and prop.get("rich_text"):
+            return prop["rich_text"][0]["plain_text"]
     except:
         return None
     return None
@@ -102,7 +109,11 @@ try:
             
             autor_texto = obtener_texto_formula(props.get("Texto Autor", {}))
             saga_texto = obtener_texto_formula(props.get("Texto Saga", {}))
-            numero_saga = obtener_numero(props.get("Nº Saga", {}))
+            
+            # Busca la columna aunque se llame Nº Saga, Numero Saga u Orden
+            prop_num = props.get("Nº Saga") or props.get("Numero Saga") or props.get("Orden") or {}
+            numero_saga = obtener_numero(prop_num)
+            
             colores_portada = obtener_colores_multiselect(props.get("Color", {}))
             
             nombre_desplegable = f"{titulo}, de {autor_texto}" if autor_texto else titulo
@@ -132,12 +143,19 @@ try:
         st.write(f"Has elegido **{libro_elegido}**.")
         st.markdown("---")
         
-        # --- FUNCIÓN DE MENSAJE INTELIGENTE ---
         def formato_mensaje(rec):
             mensaje = f"Prueba con **{rec['titulo']}**, de {rec['autor_texto']}."
             if rec['saga_texto']:
-                # Aquí está la magia: añade el número si existe
-                num_texto = f" (Libro {int(rec['numero_saga'])})" if rec['numero_saga'] is not None else ""
+                num = rec['numero_saga']
+                if num is not None and str(num).strip() != "":
+                    # Si viene como float (ej: 1.0), lo convertimos a entero
+                    try:
+                        num = int(float(num))
+                    except:
+                        pass
+                    num_texto = f" (Libro {num})"
+                else:
+                    num_texto = ""
                 mensaje += f" \n*Pertenece a {rec['saga_texto']}{num_texto}*"
             return mensaje
 
@@ -172,7 +190,7 @@ try:
             if st.button("🎨 Buscar por Color", use_container_width=True):
                 colores_ref = set(ref.get("colores", []))
                 if not colores_ref:
-                    st.warning("Este libro todavía no ha sido analizado por el robot.")
+                    st.warning("Este libro todavía no ha sido analizado por el robot de colores.")
                 else:
                     opciones = [p for p in pendientes if set(p.get("colores", [])).intersection(colores_ref)]
                     if opciones:
