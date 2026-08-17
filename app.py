@@ -40,6 +40,15 @@ def obtener_texto_formula(prop):
         return ""
     return ""
 
+# Nueva función para leer la paleta de 3 colores (Multi-select)
+def obtener_colores_multiselect(prop):
+    try:
+        if prop["type"] == "multi_select":
+            return [c["name"] for c in prop["multi_select"]]
+    except:
+        return []
+    return []
+
 st.title("📚 Mi Recomendador de Lectura")
 
 try:
@@ -80,8 +89,6 @@ try:
             props = libro["properties"]
             titulo = obtener_titulo(props.get("Título", {}))
             
-            # --- FILTRO ANTIFANTASMAS ---
-            # Si el libro no tiene título, lo ignoramos y pasamos al siguiente
             if titulo == "Sin título":
                 continue
                 
@@ -91,6 +98,7 @@ try:
             
             autor_texto = obtener_texto_formula(props.get("Texto Autor", {}))
             saga_texto = obtener_texto_formula(props.get("Texto Saga", {}))
+            colores_portada = obtener_colores_multiselect(props.get("Color", {}))
             
             nombre_desplegable = f"{titulo}, de {autor_texto}" if autor_texto else titulo
             
@@ -98,6 +106,7 @@ try:
                 "titulo": titulo,
                 "autor_texto": autor_texto,
                 "saga_texto": saga_texto,
+                "colores": colores_portada,
                 "estado": estado,
                 "generos": generos,
                 "autores_ids": autores_ids
@@ -130,21 +139,41 @@ try:
         
         col1, col2, col3 = st.columns(3)
         
+        # --- EL BOTÓN DE GÉNEROS MEJORADO (MATCH DE ALTA PUREZA) ---
         with col1:
             if st.button("🔮 Mismo género, distinto autor", use_container_width=True):
-                opciones = [
-                    p for p in pendientes 
-                    if any(g in p["generos"] for g in ref["generos"]) 
-                    and not any(a in p["autores_ids"] for a in ref["autores_ids"])
-                ]
-                if opciones:
-                    rec = random.choice(opciones)
-                    mensaje = f"¡Prueba con **{rec['titulo']}**, de {rec['autor_texto']}!"
+                generos_ref = set(ref["generos"])
+                autores_ref = set(ref["autores_ids"])
+                
+                # Buscamos coincidencias
+                opciones_puras = []
+                opciones_suaves = []
+                
+                for p in pendientes:
+                    # Que no sea del mismo autor
+                    if not set(p["autores_ids"]).intersection(autores_ref):
+                        generos_p = set(p["generos"])
+                        comunes = generos_ref.intersection(generos_p)
+                        
+                        if len(comunes) >= 2:
+                            opciones_puras.append(p)
+                        elif len(comunes) == 1:
+                            opciones_suaves.append(p)
+                
+                if opciones_puras:
+                    rec = random.choice(opciones_puras)
+                    mensaje = f"🔥 **¡Match de Alta Pureza!** (Coinciden varios géneros).\n\nPrueba con **{rec['titulo']}**, de {rec['autor_texto']}."
+                    if rec['saga_texto']:
+                        mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
+                    st.success(mensaje)
+                elif opciones_suaves:
+                    rec = random.choice(opciones_suaves)
+                    mensaje = f"✨ **Match Suave** (Coincide 1 género).\n\nPrueba con **{rec['titulo']}**, de {rec['autor_texto']}."
                     if rec['saga_texto']:
                         mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
                     st.success(mensaje)
                 else:
-                    st.warning("No tienes libros pendientes con este género exacto de otros autores.")
+                    st.warning("No tienes libros pendientes que compartan géneros con este y sean de otros autores.")
                     
         with col2:
             if st.button("🔄 Cambio radical", use_container_width=True):
@@ -162,9 +191,32 @@ try:
                 else:
                     st.warning("¡Añade más variedad a tu lista de pendientes!")
                     
+        # --- EL BOTÓN DE COLORES CON PALETAS (COMPARTEN VIBRA VISUAL) ---
         with col3:
             if st.button("🎨 Buscar por Color", use_container_width=True):
-                st.info("Próximamente: filtrado automático por portadas.")
+                colores_ref = set(ref.get("colores", []))
+                
+                if not colores_ref:
+                    st.warning("Este libro todavía no ha sido analizado por el robot de colores.")
+                else:
+                    # Buscamos libros pendientes que compartan AL MENOS 1 color de la paleta
+                    opciones = [
+                        p for p in pendientes 
+                        if set(p.get("colores", [])).intersection(colores_ref)
+                    ]
+                    
+                    if opciones:
+                        rec = random.choice(opciones)
+                        # Averiguamos qué color o colores coinciden exactamente para decírselo al usuario
+                        colores_comunes = list(set(rec['colores']).intersection(colores_ref))
+                        texto_colores = " y ".join(colores_comunes)
+                        
+                        mensaje = f"Comparten tonos de **{texto_colores}**.\n\nSigue la misma estética leyendo **{rec['titulo']}**, de {rec['autor_texto']}."
+                        if rec['saga_texto']:
+                            mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
+                        st.success(mensaje)
+                    else:
+                        st.warning("No tienes libros pendientes con portadas que compartan esta paleta.")
 
 except Exception as e:
     st.error("❌ Ups, hubo un problema interno.")
