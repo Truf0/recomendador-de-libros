@@ -97,18 +97,19 @@ try:
                         "numero_saga": obtener_numero(props.get("Nº Saga", {})),
                         "colores": obtener_colores_multiselect(props.get("Color", {})),
                         "generos": obtener_ids(props.get("Género", {})),
-                        "autores_ids": obtener_ids(props.get("Autor", {}))
+                        "autores_ids": obtener_ids(props.get("Autor", {})),
+                        "es_por_terminar": False
                     }
                     
                     nombre_visual = f"{info_libro['titulo']}, de {info_libro['autor_texto']}" if info_libro['autor_texto'] else info_libro['titulo']
                     diccionario_libros[nombre_visual] = info_libro
                     
+                    # Clasificación estricta según tus reglas
                     if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
                         leidos.append(nombre_visual)
-                    elif "por terminar" in estado:
-                        por_terminar.append(nombre_visual)
-                    elif any(k in estado for k in ["leyendo", "en curso", "reading", "retomar"]):
-                        pass
+                    elif any(k in estado for k in ["por terminar", "leyendo", "en curso", "reading", "retomar"]):
+                        info_libro["es_por_terminar"] = True
+                        por_terminar.append(info_libro)
                     else:
                         pendientes.append(info_libro)
                 
@@ -117,19 +118,25 @@ try:
             else:
                 break
 
-    opciones_selector = leidos + por_terminar
-    opciones_selector.sort()
+    # El desplegable solo tiene los leídos
+    leidos.sort()
     
-    candidatos = pendientes
+    # Las recomendaciones miran en Por leer (pendientes) + Por terminar
+    candidatos = pendientes + por_terminar
     
     st.subheader("🎯 Tu punto de partida")
-    libro_elegido = st.selectbox("Último título leído", opciones_selector)
+    libro_elegido = st.selectbox("Último título leído", leidos)
     ref = diccionario_libros[libro_elegido]
     
     st.markdown("---")
     
     def formato_mensaje(rec):
-        mensaje = f"Prueba con **{rec['titulo']}**, de {rec['autor_texto']}."
+        # Si es un libro de "por terminar", usamos la frase especial
+        if rec.get("es_por_terminar", False):
+            mensaje = f"¿Y si retomas este libro?\n\n**{rec['titulo']}**, de {rec['autor_texto']}."
+        else:
+            mensaje = f"Prueba con **{rec['titulo']}**, de {rec['autor_texto']}."
+            
         if rec['saga_texto']:
             num = rec['numero_saga']
             num_texto = f" (Libro {int(float(num))})" if (num and str(num).replace('.','',1).isdigit()) else ""
@@ -144,20 +151,20 @@ try:
             a_ref = set(ref["autores_ids"])
             opciones = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref) and len(g_ref.intersection(set(p["generos"]))) >= 1]
             if opciones: st.success(formato_mensaje(random.choice(opciones)))
-            else: st.warning("No hay coincidencias de género en tus pendientes.")
+            else: st.warning("No hay coincidencias de género.")
 
     with col2:
         if st.button("🔄 Cambio radical", use_container_width=True):
             opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
             if opciones: st.success(f"Rompe con todo:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("¡Añade más variedad a tus pendientes!")
+            else: st.warning("¡Añade más variedad!")
 
     with col3:
         if st.button("🎨 Buscar por Color", use_container_width=True):
             c_ref = set(ref.get("colores", []))
             opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
             if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("No hay libros en pendientes con esta paleta.")
+            else: st.warning("No hay libros con esta paleta.")
 
 except Exception as e:
     st.error("❌ Ups, error al cargar.")
