@@ -7,7 +7,6 @@ st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide"
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
 
-# ... [Mantenemos todas las funciones auxiliares: obtener_titulo, obtener_estado, obtener_ids, etc.] ...
 def obtener_titulo(prop):
     try:
         titulo_real = prop["title"][0]["plain_text"]
@@ -71,8 +70,8 @@ try:
     }
     
     leidos = []
+    por_terminar = []
     pendientes = []
-    leyendo = []
     diccionario_libros = {}
     
     with st.spinner('Cargando estantería completa...'):
@@ -104,10 +103,14 @@ try:
                     nombre_visual = f"{info_libro['titulo']}, de {info_libro['autor_texto']}" if info_libro['autor_texto'] else info_libro['titulo']
                     diccionario_libros[nombre_visual] = info_libro
                     
-                    if estado in ["leído", "terminado", "finished", "leídos"]:
+                    # Clasificación exacta según tus categorías
+                    if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
                         leidos.append(nombre_visual)
-                    elif estado in ["leyendo", "en curso", "reading", "retomar"]:
-                        leyendo.append(info_libro)
+                    elif "por terminar" in estado:
+                        por_terminar.append(nombre_visual)
+                    elif any(k in estado for k in ["leyendo", "en curso", "reading", "retomar"]):
+                        # Los ignoramos para que no aparezcan en el desplegable
+                        pass
                     else:
                         pendientes.append(info_libro)
                 
@@ -116,18 +119,15 @@ try:
             else:
                 break
 
-    # --- AQUÍ ESTÁ EL CAMBIO: COMBINAMOS TODO PARA RECOMENDAR ---
-    candidatos = pendientes + leyendo
+    # Unimos Leídos + Por terminar para el selector principal
+    opciones_selector = leidos + por_terminar
+    opciones_selector.sort()
     
-    leidos.sort()
-    st.subheader("🎯 Tu punto de partida (Libros Leídos)")
-    libro_elegido = st.selectbox("Selecciona un libro que ya hayas terminado:", leidos)
+    candidatos = pendientes
+    
+    st.subheader("🎯 Tu punto de partida")
+    libro_elegido = st.selectbox("Selecciona un libro (Leídos o Por terminar):", opciones_selector)
     ref = diccionario_libros[libro_elegido]
-    
-    if leyendo:
-        st.warning("⚠️ **Tienes libros a medias:**")
-        for lib in leyendo:
-            st.write(f"¿Y si retomas **{lib['titulo']}**?")
     
     st.markdown("---")
     st.write(f"Base de recomendación: **{libro_elegido}**.")
@@ -147,23 +147,22 @@ try:
         if st.button("🔮 Mismo género", use_container_width=True):
             g_ref = set(ref["generos"])
             a_ref = set(ref["autores_ids"])
-            # Filtramos sobre candidatos (pendientes + leyendo)
             opciones = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref) and len(g_ref.intersection(set(p["generos"]))) >= 1]
             if opciones: st.success(formato_mensaje(random.choice(opciones)))
-            else: st.warning("No hay coincidencias de género.")
+            else: st.warning("No hay coincidencias de género en tus pendientes.")
 
     with col2:
         if st.button("🔄 Cambio radical", use_container_width=True):
             opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
             if opciones: st.success(f"Rompe con todo:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("¡Añade más variedad!")
+            else: st.warning("¡Añade más variedad a tus pendientes!")
 
     with col3:
         if st.button("🎨 Buscar por Color", use_container_width=True):
             c_ref = set(ref.get("colores", []))
             opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
             if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("No hay libros con esta paleta.")
+            else: st.warning("No hay libros en pendientes con esta paleta.")
 
 except Exception as e:
     st.error("❌ Ups, error al cargar.")
