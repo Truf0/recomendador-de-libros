@@ -4,7 +4,6 @@ import random
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
-# Cargamos las claves de forma segura desde Streamlit
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
 
@@ -31,6 +30,15 @@ def obtener_ids(prop):
     except:
         pass
     return []
+
+# Nueva función para extraer el texto limpio de tus fórmulas de Notion
+def obtener_texto_formula(prop):
+    try:
+        if prop["type"] == "formula":
+            return prop["formula"].get("string", "")
+    except:
+        return ""
+    return ""
 
 st.title("📚 Mi Recomendador de Lectura")
 
@@ -64,9 +72,7 @@ try:
                 break
                 
     if len(libros) > 0:
-        # (Aquí hemos quitado el mensaje verde de éxito como querías)
-        
-        nombres_libros = []
+        nombres_para_selector = []
         diccionario_libros = {}
         pendientes = []
         
@@ -75,27 +81,44 @@ try:
             titulo = obtener_titulo(props.get("Título", {}))
             estado = obtener_estado(props.get("Estado", {}))
             generos = obtener_ids(props.get("Género", {}))
-            autores = obtener_ids(props.get("Autor", {}))
+            autores_ids = obtener_ids(props.get("Autor", {}))
             
-            diccionario_libros[titulo] = {
+            # Capturamos los nuevos campos de texto
+            autor_texto = obtener_texto_formula(props.get("Texto Autor", {}))
+            saga_texto = obtener_texto_formula(props.get("Texto Saga", {}))
+            
+            # Montamos el nombre bonito para el desplegable
+            nombre_desplegable = f"{titulo} (de {autor_texto})" if autor_texto else titulo
+            
+            diccionario_libros[nombre_desplegable] = {
                 "titulo": titulo,
+                "autor_texto": autor_texto,
+                "saga_texto": saga_texto,
                 "estado": estado,
                 "generos": generos,
-                "autores": autores
+                "autores_ids": autores_ids
             }
-            nombres_libros.append(titulo)
+            nombres_para_selector.append(nombre_desplegable)
             
             if estado.lower() in ["por leer", "to read", "pendiente"]:
-                pendientes.append(diccionario_libros[titulo])
+                pendientes.append(diccionario_libros[nombre_desplegable])
 
-        nombres_libros.sort()
+        nombres_para_selector.sort()
 
         st.markdown("---")
         st.subheader("🎯 Tu punto de partida")
+        
+        # Intentamos encontrar por defecto a Reverte si está en la lista
+        indice_defecto = 0
+        for i, nombre in enumerate(nombres_para_selector):
+            if "La isla de la mujer dormida" in nombre:
+                indice_defecto = i
+                break
+
         libro_elegido = st.selectbox(
             "Selecciona un libro que hayas leído para basar las recomendaciones:", 
-            nombres_libros,
-            index=nombres_libros.index("La isla de la mujer dormida") if "La isla de la mujer dormida" in nombres_libros else 0
+            nombres_para_selector,
+            index=indice_defecto
         )
         
         ref = diccionario_libros[libro_elegido]
@@ -109,11 +132,14 @@ try:
                 opciones = [
                     p for p in pendientes 
                     if any(g in p["generos"] for g in ref["generos"]) 
-                    and not any(a in p["autores"] for a in ref["autores"])
+                    and not any(a in p["autores_ids"] for a in ref["autores_ids"])
                 ]
                 if opciones:
-                    recomendado = random.choice(opciones)
-                    st.success(f"¡Prueba con **{recomendado['titulo']}**!")
+                    rec = random.choice(opciones)
+                    mensaje = f"¡Prueba con **{rec['titulo']}**, de {rec['autor_texto']}!"
+                    if rec['saga_texto']:
+                        mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
+                    st.success(mensaje)
                 else:
                     st.warning("No tienes libros pendientes con este género exacto de otros autores.")
                     
@@ -122,11 +148,14 @@ try:
                 opciones = [
                     p for p in pendientes 
                     if not any(g in p["generos"] for g in ref["generos"]) 
-                    and not any(a in p["autores"] for a in ref["autores"])
+                    and not any(a in p["autores_ids"] for a in ref["autores_ids"])
                 ]
                 if opciones:
-                    recomendado = random.choice(opciones)
-                    st.success(f"Rompe con todo: **{recomendado['titulo']}**")
+                    rec = random.choice(opciones)
+                    mensaje = f"Rompe con todo leyendo **{rec['titulo']}**, de {rec['autor_texto']}."
+                    if rec['saga_texto']:
+                        mensaje += f" \n*(Pertenece a la saga: {rec['saga_texto']})*"
+                    st.success(mensaje)
                 else:
                     st.warning("¡Añade más variedad a tu lista de pendientes!")
                     
