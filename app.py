@@ -7,9 +7,6 @@ st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide"
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
 
-# ... [Mantenemos las mismas funciones: obtener_titulo, obtener_estado, obtener_ids, obtener_texto_formula, obtener_colores_multiselect] ...
-# (He mantenido el código de las funciones igual para que sea más fácil copiar y pegar)
-
 def obtener_titulo(prop):
     try:
         titulo_real = prop["title"][0]["plain_text"]
@@ -43,6 +40,15 @@ def obtener_texto_formula(prop):
         return ""
     return ""
 
+def obtener_numero(prop):
+    try:
+        # Lee si es propiedad de tipo Número o Número de Fórmula
+        if prop["type"] == "number": return prop["number"]
+        if prop["type"] == "formula": return prop["formula"].get("number", None)
+    except:
+        return None
+    return None
+
 def obtener_colores_multiselect(prop):
     try:
         if prop["type"] == "multi_select":
@@ -68,9 +74,7 @@ try:
     with st.spinner('Cargando estantería...'):
         while has_more:
             payload = {"page_size": 100}
-            if next_cursor:
-                payload["start_cursor"] = next_cursor
-                
+            if next_cursor: payload["start_cursor"] = next_cursor
             respuesta = requests.post(url, headers=headers, json=payload)
             
             if respuesta.status_code == 200:
@@ -90,7 +94,6 @@ try:
         for libro in libros:
             props = libro["properties"]
             titulo = obtener_titulo(props.get("Título", {}))
-            
             if titulo == "Sin título": continue
                 
             estado = obtener_estado(props.get("Estado", {}))
@@ -99,6 +102,7 @@ try:
             
             autor_texto = obtener_texto_formula(props.get("Texto Autor", {}))
             saga_texto = obtener_texto_formula(props.get("Texto Saga", {}))
+            numero_saga = obtener_numero(props.get("Nº Saga", {}))
             colores_portada = obtener_colores_multiselect(props.get("Color", {}))
             
             nombre_desplegable = f"{titulo}, de {autor_texto}" if autor_texto else titulo
@@ -107,6 +111,7 @@ try:
                 "titulo": titulo,
                 "autor_texto": autor_texto,
                 "saga_texto": saga_texto,
+                "numero_saga": numero_saga,
                 "colores": colores_portada,
                 "estado": estado,
                 "generos": generos,
@@ -122,28 +127,24 @@ try:
         st.markdown("---")
         st.subheader("🎯 Tu punto de partida")
         
-        libro_elegido = st.selectbox(
-            "Selecciona un libro que hayas leído para basar las recomendaciones:", 
-            nombres_para_selector
-        )
-        
+        libro_elegido = st.selectbox("Selecciona un libro que hayas leído:", nombres_para_selector)
         ref = diccionario_libros[libro_elegido]
         st.write(f"Has elegido **{libro_elegido}**.")
         st.markdown("---")
         
-        col1, col2, col3 = st.columns(3)
-        
-        # --- LÓGICA DE MENSAJES CON EL NUEVO FORMATO DE SAGA ---
+        # --- FUNCIÓN DE MENSAJE INTELIGENTE ---
         def formato_mensaje(rec):
             mensaje = f"Prueba con **{rec['titulo']}**, de {rec['autor_texto']}."
             if rec['saga_texto']:
-                # Aquí está el cambio: mensaje limpio
-                mensaje += f" \n*Pertenece a {rec['saga_texto']}*"
+                # Aquí está la magia: añade el número si existe
+                num_texto = f" (Libro {int(rec['numero_saga'])})" if rec['numero_saga'] is not None else ""
+                mensaje += f" \n*Pertenece a {rec['saga_texto']}{num_texto}*"
             return mensaje
 
+        col1, col2, col3 = st.columns(3)
+        
         with col1:
             if st.button("🔮 Mismo género, distinto autor", use_container_width=True):
-                # ... (resto de lógica de géneros igual)
                 generos_ref = set(ref["generos"])
                 autores_ref = set(ref["autores_ids"])
                 opciones_puras = [p for p in pendientes if not set(p["autores_ids"]).intersection(autores_ref) and len(generos_ref.intersection(set(p["generos"]))) >= 2]
@@ -171,7 +172,7 @@ try:
             if st.button("🎨 Buscar por Color", use_container_width=True):
                 colores_ref = set(ref.get("colores", []))
                 if not colores_ref:
-                    st.warning("Este libro aún no ha sido analizado por el robot.")
+                    st.warning("Este libro todavía no ha sido analizado por el robot.")
                 else:
                     opciones = [p for p in pendientes if set(p.get("colores", [])).intersection(colores_ref)]
                     if opciones:
