@@ -1,13 +1,15 @@
 import streamlit as st
 import requests
 import random
-import re # Necesario para que la IA entienda los números de las listas
+import re
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
-GEMINI_API_KEY = st.secrets.get("gemini_api_key", "") # Recoge tu nueva clave
+
+# Limpiamos la clave por si se han colado espacios o comillas al pegarla en Secrets
+GEMINI_API_KEY = st.secrets.get("gemini_api_key", "").replace('"', '').replace("'", "").strip()
 
 def obtener_titulo(prop):
     try:
@@ -184,12 +186,10 @@ try:
         if st.button("🔮 Mismo género", use_container_width=True):
             g_ref = set(ref["generos"])
             a_ref = set(ref["autores_ids"])
-            
             if not g_ref:
                 st.warning("El libro seleccionado no tiene géneros asignados.")
             else:
                 cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
-                
                 opciones_exactas = [p for p in cands if set(p["generos"]) == g_ref]
                 opciones_expandidas = [p for p in cands if g_ref.issubset(set(p["generos"])) and set(p["generos"]) != g_ref]
                 opciones_concentradas = [p for p in cands if set(p["generos"]).issubset(g_ref) and len(set(p["generos"])) > 0 and set(p["generos"]) != g_ref]
@@ -259,25 +259,22 @@ try:
     with col8:
         if st.button("🌫️ Misma Atmósfera", use_container_width=True):
             if not GEMINI_API_KEY:
-                st.error("⚠️ La clave de Gemini no se ha cargado. Revisa tus Secrets de Streamlit.")
+                st.error("⚠️ La clave de Gemini no se ha cargado o está en blanco.")
             elif not ref.get("descripcion"):
                 st.warning("El libro que has elegido no tiene texto en la propiedad 'Descripción'.")
             else:
-                # Filtramos solo candidatos que tengan una sinopsis razonablemente larga (más de 20 caracteres)
                 cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
                 
                 if not cands_validos:
                     st.warning("No tienes libros pendientes con descripción en Notion para poder analizarlos.")
                 else:
                     with st.spinner("🧠 Leyendo sinopsis para encontrar esa misma vibra..."):
-                        # Preparamos la lista para enviársela a la IA
                         texto_cands = ""
                         for i, c in enumerate(cands_validos):
-                            # Recortamos a 600 caracteres cada sinopsis para que la IA lea rápido la esencia
                             texto_cands += f"[{i}] {c['titulo']} - {c['descripcion'][:600]}...\n"
                             
                         prompt = f"""
-                        Eres un experto recomendador de libros basado en atmósferas y tonos narrativos (misterio opresivo, aventuras ligeras, escenario aislado, etc.).
+                        Eres un experto recomendador de libros basado en atmósferas y tonos narrativos.
                         
                         Libro de referencia leído por el usuario:
                         Título: {ref['titulo']}
@@ -287,9 +284,9 @@ try:
                         {texto_cands}
                         
                         Tu tarea:
-                        1. Analiza profundamente la atmósfera, el tono y la 'vibra' del libro de referencia.
-                        2. Busca en la lista de candidatos el libro que comparta la esencia narrativa o el escenario más similar.
-                        3. IMPORTANTE: Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3]. NO escribas explicaciones ni nada más.
+                        1. Analiza la atmósfera, el tono y la 'vibra' del libro de referencia.
+                        2. Busca en la lista el candidato que comparta la esencia narrativa.
+                        3. Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3].
                         """
                         
                         url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -303,19 +300,19 @@ try:
                             
                             if res.status_code == 200:
                                 texto_respuesta = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                # Buscamos el número entre corchetes usando expresiones regulares
                                 match = re.search(r'\[(\d+)\]', texto_respuesta)
                                 
                                 if match:
                                     idx = int(match.group(1))
                                     if 0 <= idx < len(cands_validos):
-                                        st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia o escenario.*")
+                                        st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia.*")
                                     else:
                                         st.error("Error lógico en la respuesta de la IA. Inténtalo de nuevo.")
                                 else:
                                     st.warning("La IA encontró una similitud pero dudó en el formato. ¡Vuelve a pulsar el botón!")
                             else:
-                                st.error("Ups, la API de Gemini ha devuelto un error al intentar leer.")
+                                # ESTE ES EL CHIVATO:
+                                st.error(f"⚠️ Error de Gemini (Código {res.status_code}): {res.text}")
                         except Exception as e:
                             st.error(f"Error de conexión con el servidor: {e}")
 
