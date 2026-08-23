@@ -113,16 +113,14 @@ try:
                     nombre_visual = f"{info_libro['titulo']}, de {info_libro['autor_texto']}" if info_libro['autor_texto'] else info_libro['titulo']
                     diccionario_libros[nombre_visual] = info_libro
                     
-                    # --- AQUÍ ESTÁ LA CORRECCIÓN DE LAS POOLS ---
                     if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
                         leidos.append(nombre_visual)
                     elif "por terminar" in estado:
                         info_libro["es_por_terminar"] = True
                         por_terminar.append(info_libro)
                     elif any(k in estado for k in ["leyendo", "en curso", "reading"]):
-                        pass # ¡POOL DE LEYENDO! Los ignoramos totalmente para que no salgan recomendados.
+                        pass 
                     else:
-                        # Si no es Leído, ni Por Terminar, ni Leyendo, va a la Pool de Pendientes
                         pendientes.append(info_libro)
                 
                 has_more = datos.get("has_more", False)
@@ -130,10 +128,7 @@ try:
             else:
                 break
 
-    # El desplegable solo tiene los leídos (alfabéticamente)
     leidos.sort()
-    
-    # Las recomendaciones miran en Pendientes + Por terminar
     candidatos = pendientes + por_terminar
     
     st.subheader("🎯 Tu punto de partida")
@@ -143,7 +138,6 @@ try:
     st.markdown("---")
     
     def formato_mensaje(rec):
-        # Frase especial según de qué "pool" provenga el libro
         if rec.get("es_por_terminar", False):
             mensaje = f"¿Y si retomas este libro?\n\n**{rec['titulo']}**, de {rec['autor_texto']}."
         else:
@@ -155,30 +149,40 @@ try:
             mensaje += f" \n*Pertenece a {rec['saga_texto']}{num_texto}*"
         return mensaje
 
-    col1, col2, col3, col4 = st.columns(4)
+    # Ahora dividimos en 5 columnas
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         if st.button("🔮 Mismo género", use_container_width=True):
             g_ref = set(ref["generos"])
             a_ref = set(ref["autores_ids"])
+            # Busca mismo género, pero excluye al autor para que haya variedad
             opciones = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref) and len(g_ref.intersection(set(p["generos"]))) >= 1]
             if opciones: st.success(formato_mensaje(random.choice(opciones)))
             else: st.warning("No hay coincidencias de género.")
 
     with col2:
+        if st.button("✍️ Mismo autor", use_container_width=True):
+            a_ref = set(ref["autores_ids"])
+            # Busca exclusivamente que compartan autor
+            opciones = [p for p in candidatos if set(p["autores_ids"]).intersection(a_ref)]
+            if opciones: st.success(f"Siguiendo con su pluma:\n\n{formato_mensaje(random.choice(opciones))}")
+            else: st.warning("No te quedan libros pendientes de este autor.")
+
+    with col3:
         if st.button("🔄 Cambio radical", use_container_width=True):
             opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
             if opciones: st.success(f"Rompe con todo:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("¡Añade más variedad!")
 
-    with col3:
+    with col4:
         if st.button("🎨 Buscar por Color", use_container_width=True):
             c_ref = set(ref.get("colores", []))
             opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
             if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("No hay libros con esta paleta.")
 
-    with col4:
+    with col5:
         if st.button("🇬🇧 En Inglés", use_container_width=True):
             opciones = [p for p in candidatos if p.get("es_ingles", False)]
             if opciones: st.success(f"Para tu reto de lectura:\n\n{formato_mensaje(random.choice(opciones))}")
