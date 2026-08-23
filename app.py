@@ -1,17 +1,13 @@
 import streamlit as st
 import requests
 import random
-import re
-import google.generativeai as genai
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
-GEMINI_API_KEY = st.secrets.get("gemini_api_key", "").replace('"', '').replace("'", "").strip()
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
 
 def obtener_titulo(prop):
     try:
@@ -265,55 +261,34 @@ try:
 
     with col8:
         if st.button("🌫️ Misma Atmósfera", use_container_width=True):
-            if not GEMINI_API_KEY:
-                st.error("⚠️ La clave de Gemini no se ha cargado o está en blanco.")
-            elif not ref.get("descripcion"):
-                st.warning("El libro que has elegido no tiene texto en la propiedad 'Descripción'.")
+            if not ref.get("descripcion") or len(ref.get("descripcion")) < 20:
+                st.warning("El libro seleccionado no tiene una descripción suficientemente detallada en Notion.")
             else:
                 cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
                 
                 if not cands_validos:
                     st.warning("No tienes libros pendientes con descripción en Notion para poder analizarlos.")
                 else:
-                    with st.spinner("🧠 Leyendo sinopsis para encontrar esa misma vibra..."):
-                        texto_cands = ""
-                        for i, c in enumerate(cands_validos):
-                            texto_cands += f"[{i}] {c['titulo']} - {c['descripcion'][:600]}...\n"
-                            
-                        prompt = f"""
-                        Eres un experto recomendador de libros basado en atmósferas y tonos narrativos.
+                    with st.spinner("🧠 Analizando la atmósfera temática de las sinopsis..."):
+                        # Preparamos los textos: el primero es la referencia, los siguientes los candidatos
+                        textos = [ref["descripcion"]] + [c["descripcion"] for c in cands_validos]
                         
-                        Libro de referencia leído por el usuario:
-                        Título: {ref['titulo']}
-                        Sinopsis: {ref['descripcion']}
+                        # Vectorizamos las descripciones matemáticamente
+                        vectorizer = TfidfVectorizer()
+                        matriz_tfidf = vectorizer.fit_transform(textos)
                         
-                        Lista de candidatos pendientes:
-                        {texto_cands}
+                        # Calculamos la similitud del libro de referencia con respecto a todos los candidatos
+                        similitudes = cosine_similarity(matriz_tfidf[0:1], matriz_tfidf[1:]).flatten()
                         
-                        Tu tarea:
-                        1. Analiza la atmósfera, el tono y la 'vibra' del libro de referencia.
-                        2. Busca en la lista el candidato que comparta la esencia narrativa.
-                        3. Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3].
-                        """
+                        # Buscamos el índice del candidato con mayor similitud atmosférica/temática
+                        mejor_idx = similitudes.argmax()
+                        mejor_puntuacion = similitudes[mejor_idx]
                         
-                        try:
-                            # Usamos el modelo oficial actual con la librería de Google
-                            model = genai.GenerativeModel('gemini-1.5-flash')
-                            respuesta_ia = model.generate_content(prompt)
-                            texto_respuesta = respuesta_ia.text.strip()
-                            
-                            match = re.search(r'\[(\d+)\]', texto_respuesta)
-                            
-                            if match:
-                                idx = int(match.group(1))
-                                if 0 <= idx < len(cands_validos):
-                                    st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia.*")
-                                else:
-                                    st.error("Error lógico en la respuesta de la IA. Inténtalo de nuevo.")
-                            else:
-                                st.warning("La IA encontró una similitud pero dudó en el formato. ¡Vuelve a pulsar el botón!")
-                        except Exception as e:
-                            st.error(f"Error al conectar con el cerebro de la IA: {e}")
+                        if mejor_puntuacion > 0.05:  # Umbral mínimo de coincidencia
+                            libro_ganador = cands_validos[mejor_idx]
+                            st.success(f"🧠 **Match por Atmósfera detectado (Análisis temático):**\n\n{formato_mensaje(libro_ganador)}\n\n*Las sinopsis comparten similitudes notables en vocabularies y temas narrativos.*")
+                        else:
+                            st.warning("No se ha encontrado un libro pendiente con una atmósfera o temática similar en las descripciones.")
 
 except Exception as e:
     st.error(f"❌ Ups, error al cargar: {e}")
