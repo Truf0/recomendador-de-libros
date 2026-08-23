@@ -67,6 +67,25 @@ def obtener_checkbox(prop):
         return False
     return False
 
+# Función clave para no saltarse libros de una saga
+def safe_float(val):
+    try:
+        return float(val)
+    except:
+        return 9999.0
+
+# Esta función filtra una lista de libros y devuelve SOLO el primer libro disponible de cada saga
+def primeras_de_saga(lista_candidatos):
+    sagas = {}
+    for libro in lista_candidatos:
+        saga = libro.get("saga_texto")
+        num = libro.get("numero_saga")
+        if saga and num is not None:
+            n = safe_float(num)
+            if saga not in sagas or n < sagas[saga]["n"]:
+                sagas[saga] = {"n": n, "libro": libro}
+    return [v["libro"] for v in sagas.values()]
+
 st.title("📚 Mi Recomendador de Lectura")
 
 try:
@@ -149,14 +168,13 @@ try:
             mensaje += f" \n*Pertenece a {rec['saga_texto']}{num_texto}*"
         return mensaje
 
-    # Ahora dividimos en 5 columnas
-    col1, col2, col3, col4, col5 = st.columns(5)
+    st.markdown("#### 🎲 Opciones Rápidas")
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         if st.button("🔮 Mismo género", use_container_width=True):
             g_ref = set(ref["generos"])
             a_ref = set(ref["autores_ids"])
-            # Busca mismo género, pero excluye al autor para que haya variedad
             opciones = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref) and len(g_ref.intersection(set(p["generos"]))) >= 1]
             if opciones: st.success(formato_mensaje(random.choice(opciones)))
             else: st.warning("No hay coincidencias de género.")
@@ -164,7 +182,6 @@ try:
     with col2:
         if st.button("✍️ Mismo autor", use_container_width=True):
             a_ref = set(ref["autores_ids"])
-            # Busca exclusivamente que compartan autor
             opciones = [p for p in candidatos if set(p["autores_ids"]).intersection(a_ref)]
             if opciones: st.success(f"Siguiendo con su pluma:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("No te quedan libros pendientes de este autor.")
@@ -175,14 +192,44 @@ try:
             if opciones: st.success(f"Rompe con todo:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("¡Añade más variedad!")
 
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 🔍 Opciones Avanzadas")
+    col4, col5, col6, col7 = st.columns(4)
+    
     with col4:
+        if st.button("🔗 Continuar Saga", use_container_width=True):
+            saga_actual = ref.get("saga_texto")
+            if not saga_actual:
+                st.warning("El libro seleccionado no pertenece a ninguna saga conocida.")
+            else:
+                opciones = [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga") is not None]
+                if opciones:
+                    # Matemáticamente elegimos el número de saga más bajo que te queda por leer
+                    siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
+                    st.success(f"El viaje continúa:\n\n{formato_mensaje(siguiente)}")
+                else:
+                    st.warning("¡Felicidades! Estás al día con esta saga (o no tienes las continuaciones en pendientes).")
+                    
+    with col5:
+        if st.button("📚 Saga Similar", use_container_width=True):
+            g_ref = set(ref["generos"])
+            # Buscamos libros que pertenezcan a OTRA saga y compartan género
+            candidatos_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(g_ref.intersection(set(p["generos"]))) >= 1]
+            # Extraemos matemáticamente solo los inicios disponibles de cada saga
+            opciones_inicio = primeras_de_saga(candidatos_saga)
+            if opciones_inicio:
+                st.success(f"Empieza una nueva aventura:\n\n{formato_mensaje(random.choice(opciones_inicio))}")
+            else:
+                st.warning("No hay nuevas sagas de este género listas para empezar.")
+
+    with col6:
         if st.button("🎨 Buscar por Color", use_container_width=True):
             c_ref = set(ref.get("colores", []))
             opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
             if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("No hay libros con esta paleta.")
 
-    with col5:
+    with col7:
         if st.button("🇬🇧 En Inglés", use_container_width=True):
             opciones = [p for p in candidatos if p.get("es_ingles", False)]
             if opciones: st.success(f"Para tu reto de lectura:\n\n{formato_mensaje(random.choice(opciones))}")
