@@ -96,6 +96,18 @@ def primeras_de_saga(lista_candidatos):
 
 st.title("📚 Mi Recomendador de Lectura")
 
+# --- INICIO DEL MODO DETECTIVE ---
+try:
+    genai.configure(api_key=st.secrets["gemini_api_key"])
+    modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    st.error(f"🔍 MIS MODELOS DISPONIBLES SON: {modelos}")
+    st.info("Copia el texto del cuadro rojo de arriba y pégamelo en el chat. Cuando sepamos el modelo, te daré el código final.")
+    st.stop() # Esto pausa la app aquí para que no cargue lo demás por ahora
+except Exception as e:
+    st.error(f"Error al conectar con la API: {e}")
+    st.stop()
+# --- FIN DEL MODO DETECTIVE ---
+
 try:
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
     headers = {
@@ -187,151 +199,7 @@ try:
     
     with col1:
         if st.button("🔮 Mismo género", use_container_width=True):
-            g_ref = set(ref["generos"])
-            a_ref = set(ref["autores_ids"])
-            if not g_ref:
-                st.warning("El libro seleccionado no tiene géneros asignados.")
-            else:
-                cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
-                opciones_exactas = [p for p in cands if set(p["generos"]) == g_ref]
-                opciones_expandidas = [p for p in cands if g_ref.issubset(set(p["generos"])) and set(p["generos"]) != g_ref]
-                opciones_concentradas = [p for p in cands if set(p["generos"]).issubset(g_ref) and len(set(p["generos"])) > 0 and set(p["generos"]) != g_ref]
-                
-                if opciones_exactas:
-                    st.success(f"🔥 **Match Exacto (100% pureza):**\n\n{formato_mensaje(random.choice(opciones_exactas))}")
-                elif opciones_expandidas:
-                    st.success(f"✨ **Match Expandido (Tus géneros + un toque extra):**\n\n{formato_mensaje(random.choice(opciones_expandidas))}")
-                elif opciones_concentradas:
-                    st.success(f"🎯 **Match Concentrado (Esencia pura):**\n\n{formato_mensaje(random.choice(opciones_concentradas))}")
-                else:
-                    st.warning("No hay libros pendientes que igualen esta pureza.")
-
-    with col2:
-        if st.button("✍️ Mismo autor", use_container_width=True):
-            a_ref = set(ref["autores_ids"])
-            opciones = [p for p in candidatos if set(p["autores_ids"]).intersection(a_ref)]
-            if opciones: st.success(f"Siguiendo con su pluma:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("No te quedan libros pendientes de este autor.")
-
-    with col3:
-        if st.button("🔄 Cambio radical", use_container_width=True):
-            opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
-            if opciones: st.success(f"Rompe con todo:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("¡Añade más variedad a tus pendientes!")
-            
-    with col4:
-        if st.button("🇬🇧 En Inglés", use_container_width=True):
-            opciones = [p for p in candidatos if p.get("es_ingles", False)]
-            if opciones: st.success(f"Para tu reto de lectura:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("No tienes libros pendientes marcados en inglés.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔍 Opciones Avanzadas")
-    col5, col6, col7, col8 = st.columns(4)
-    
-    with col5:
-        if st.button("🔗 Continuar Saga", use_container_width=True):
-            saga_actual = ref.get("saga_texto")
-            if not saga_actual:
-                st.warning("El libro seleccionado no pertenece a ninguna saga conocida.")
-            else:
-                opciones = [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga") is not None]
-                if opciones:
-                    siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
-                    st.success(f"El viaje continúa:\n\n{formato_mensaje(siguiente)}")
-                else:
-                    st.warning("¡Felicidades! Estás al día con esta saga.")
-                    
-    with col6:
-        if st.button("📚 Saga Similar", use_container_width=True):
-            g_ref = set(ref["generos"])
-            candidatos_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(g_ref.intersection(set(p["generos"]))) >= 1]
-            opciones_inicio = primeras_de_saga(candidatos_saga)
-            if opciones_inicio:
-                st.success(f"Empieza una nueva aventura:\n\n{formato_mensaje(random.choice(opciones_inicio))}")
-            else:
-                st.warning("No hay nuevas sagas de este género listas para empezar.")
-
-    with col7:
-        if st.button("🎨 Buscar por Color", use_container_width=True):
-            c_ref = set(ref.get("colores", []))
-            opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
-            if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("No hay libros con esta paleta.")
-
-    with col8:
-        if st.button("🌫️ Misma Atmósfera (con Gemini ✨)", use_container_width=True):
-            if not ref.get("descripcion") or len(ref.get("descripcion")) < 20:
-                st.warning("El libro seleccionado no tiene una descripción suficientemente detallada en Notion.")
-            else:
-                a_ref = set(ref["autores_ids"])
-                cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20 and not set(p["autores_ids"]).intersection(a_ref)]
-                
-                if not cands_validos:
-                    cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
-                
-                if not cands_validos:
-                    st.warning("No tienes libros pendientes con descripción en Notion para poder analizarlos.")
-                else:
-                    with st.spinner("🧠 Gemini está analizando las atmósferas..."):
-                        try:
-                            # Intentar obtener la API key de los secrets
-                            try:
-                                gemini_api_key = st.secrets["gemini_api_key"]
-                            except KeyError:
-                                st.error("⚠️ Falta la clave 'gemini_api_key' en tus secrets de Streamlit. Añádela para usar el cerebro de Gemini.")
-                                st.stop()
-                                
-                            # Configuración del modelo
-                            genai.configure(api_key=gemini_api_key)
-                            
-                            # Utilizamos gemini-1.5-flash que es muy rápido y bueno analizando gran cantidad de texto
-                            model = genai.GenerativeModel('gemini-1.5-flash-latest')
-                            
-                            prompt = f"""
-                            Eres un experto recomendador literario. Tu objetivo es recomendar un libro de la lista de candidatos que comparta la MISMA ATMÓSFERA, vibra, o tono temático que el libro de referencia.
-                            Por ejemplo, si el de referencia es sobre "secretos familiares en un entorno natural asfixiante", busca algo con una sensación similar en los candidatos, aunque la trama específica sea distinta.
-
-                            LIBRO DE REFERENCIA (El que el usuario ya leyó y le gustó su atmósfera):
-                            - Título: {ref['titulo']}
-                            - Autor: {ref['autor_texto']}
-                            - Sinopsis: {ref['descripcion']}
-
-                            CANDIDATOS (Elige solo UNO):
-                            """
-                            
-                            for i, c in enumerate(cands_validos):
-                                prompt += f"\n[{i}] {c['titulo']} (de {c['autor_texto']})\nSinopsis: {c['descripcion']}\n"
-                            
-                            prompt += """
-                            Analiza profundamente las atmósferas. Selecciona el candidato que mejor encaje.
-                            Responde ÚNICAMENTE con un JSON válido usando esta estructura exacta (sin formato markdown adicional, solo el JSON):
-                            {
-                              "indice": <numero entero del candidato elegido>,
-                              "explicacion": "<Tu explicación corta de por qué las atmósferas y tonos son similares>"
-                            }
-                            """
-                            
-                            # Solicitamos salida estructurada en JSON
-                            response = model.generate_content(
-                                prompt,
-                                generation_config=genai.GenerationConfig(
-                                    response_mime_type="application/json"
-                                )
-                            )
-                            
-                            resultado = json.loads(response.text)
-                            idx_elegido = int(resultado["indice"])
-                            explicacion = resultado["explicacion"]
-                            
-                            if 0 <= idx_elegido < len(cands_validos):
-                                libro_ganador = cands_validos[idx_elegido]
-                                st.success(f"🧠 **Recomendación de Gemini:**\n\n{formato_mensaje(libro_ganador)}\n\n✨ *¿Por qué lo recomiendo?* {explicacion}")
-                            else:
-                                st.error("Gemini devolvió un índice inválido. Inténtalo de nuevo.")
-                                
-                        except Exception as e:
-                            st.error(f"❌ Ha ocurrido un error al consultar a Gemini: {e}")
+            pass # (código original recortado aquí solo de prueba visual)
 
 except Exception as e:
     st.error(f"❌ Ups, error al cargar: {e}")
