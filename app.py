@@ -108,6 +108,7 @@ try:
     por_terminar = []
     pendientes = []
     diccionario_libros = {}
+    autores_leidos_ids = set() # <-- MEMORIA PARA "SANGRE NUEVA"
     
     with st.spinner('Cargando estantería completa...'):
         has_more = True
@@ -148,6 +149,9 @@ try:
                     
                     if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
                         leidos.append(nombre_visual)
+                        # Guardamos los IDs de los autores que ya has leído
+                        for a_id in info_libro["autores_ids"]:
+                            autores_leidos_ids.add(a_id)
                     elif "por terminar" in estado:
                         info_libro["es_por_terminar"] = True
                         por_terminar.append(info_libro)
@@ -260,9 +264,9 @@ try:
             else: st.warning("No hay libros con esta paleta.")
 
     with col8:
-        if st.button("🌫️ Misma Atmósfera (con Gemini ✨)", use_container_width=True):
+        if st.button("🌫️ Misma Atmósfera (Gemini ✨)", use_container_width=True):
             if not ref.get("descripcion") or len(ref.get("descripcion")) < 20:
-                st.warning("El libro seleccionado no tiene una descripción suficientemente detallada en Notion.")
+                st.warning("El libro seleccionado no tiene descripción suficiente en Notion.")
             else:
                 a_ref = set(ref["autores_ids"])
                 cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20 and not set(p["autores_ids"]).intersection(a_ref)]
@@ -271,55 +275,38 @@ try:
                     cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
                 
                 if not cands_validos:
-                    st.warning("No tienes libros pendientes con descripción en Notion para poder analizarlos.")
+                    st.warning("No tienes libros pendientes con descripción en Notion para analizarlos.")
                 else:
                     with st.spinner("🧠 Gemini está analizando las atmósferas..."):
                         try:
-                            # Intentar obtener la API key de los secrets
-                            try:
-                                gemini_api_key = st.secrets["gemini_api_key"]
-                            except KeyError:
-                                st.error("⚠️ Falta la clave 'gemini_api_key' en tus secrets. Añádela para usar el cerebro de Gemini.")
-                                st.stop()
-                                
-                            # Configuración de Gemini
+                            gemini_api_key = st.secrets["gemini_api_key"]
                             genai.configure(api_key=gemini_api_key)
-                            
-                            # USAMOS gemini-flash-latest PARA QUE SIEMPRE ESTÉ ACTUALIZADO
-                            model = genai.GenerativeModel('gemini-flash-latest')
+                            model = genai.GenerativeModel('gemini-3.6-flash')
                             
                             prompt = f"""
-                            Eres un experto recomendador literario. Tu objetivo es recomendar un libro de la lista de candidatos que comparta la MISMA ATMÓSFERA, vibra, o tono temático que el libro de referencia.
-                            Por ejemplo, si el de referencia es sobre "secretos familiares en un entorno natural asfixiante", busca algo con una sensación similar en los candidatos, aunque la trama específica sea distinta.
+                            Eres un experto recomendador literario. Tu objetivo es recomendar un libro de los candidatos que comparta la MISMA ATMÓSFERA, vibra, o tono temático que el libro de referencia.
 
-                            LIBRO DE REFERENCIA (El que el usuario ya leyó y le gustó su atmósfera):
+                            LIBRO DE REFERENCIA:
                             - Título: {ref['titulo']}
                             - Autor: {ref['autor_texto']}
                             - Sinopsis: {ref['descripcion']}
 
                             CANDIDATOS (Elige solo UNO):
                             """
-                            
                             for i, c in enumerate(cands_validos):
                                 prompt += f"\n[{i}] {c['titulo']} (de {c['autor_texto']})\nSinopsis: {c['descripcion']}\n"
                             
                             prompt += """
-                            Analiza profundamente las atmósferas. Selecciona el candidato que mejor encaje.
-                            Responde ÚNICAMENTE con un JSON válido usando esta estructura exacta (sin formato markdown adicional, solo el JSON):
+                            Responde ÚNICAMENTE con un JSON válido usando esta estructura exacta (sin formato markdown adicional):
                             {
                               "indice": <numero entero del candidato elegido>,
                               "explicacion": "<Tu explicación corta de por qué las atmósferas y tonos son similares>"
                             }
                             """
-                            
-                            # Solicitamos salida estructurada en JSON
                             response = model.generate_content(
                                 prompt,
-                                generation_config=genai.GenerationConfig(
-                                    response_mime_type="application/json"
-                                )
+                                generation_config=genai.GenerationConfig(response_mime_type="application/json")
                             )
-                            
                             resultado = json.loads(response.text)
                             idx_elegido = int(resultado["indice"])
                             explicacion = resultado["explicacion"]
@@ -328,10 +315,85 @@ try:
                                 libro_ganador = cands_validos[idx_elegido]
                                 st.success(f"🧠 **Recomendación de Gemini:**\n\n{formato_mensaje(libro_ganador)}\n\n✨ *¿Por qué lo recomiendo?* {explicacion}")
                             else:
-                                st.error("Gemini devolvió un índice inválido. Inténtalo de nuevo.")
-                                
+                                st.error("Gemini devolvió un índice inválido.")
                         except Exception as e:
                             st.error(f"❌ Ha ocurrido un error al consultar a Gemini: {e}")
+
+    # --- NUEVA SECCIÓN: SANGRE NUEVA Y RULETA RUSA ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 💥 Nuevas Emociones")
+    col9, col10 = st.columns(2)
+    
+    with col9:
+        if st.button("🩸 Sangre Nueva (Autor Inédito)", use_container_width=True):
+            opciones = [p for p in candidatos if not any(a_id in autores_leidos_ids for a_id in p["autores_ids"])]
+            if opciones: 
+                st.success(f"Explora nuevos horizontes con esta pluma inédita para ti:\n\n{formato_mensaje(random.choice(opciones))}")
+            else: 
+                st.warning("¡Vaya! Parece que ya has catado a todos los autores de tus pendientes.")
+                
+    with col10:
+        if st.button("🎲 La Ruleta Rusa", use_container_width=True):
+            if candidatos:
+                st.success(f"La suerte está echada. No pienses, te toca leer:\n\n{formato_mensaje(random.choice(candidatos))}")
+            else:
+                st.warning("No te quedan libros pendientes. ¡Hora de ir de compras!")
+
+    # --- NUEVA SECCIÓN: EL ORÁCULO DE GEMINI (MOOD READER) ---
+    st.markdown("---")
+    st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
+    st.write("¿No sabes qué leer hoy? Olvídate de filtros y botones. Cuéntale a la Inteligencia Artificial cómo te sientes o qué te apetece y ella rebuscará en tus pendientes para darte el libro perfecto.")
+    
+    mood_texto = st.text_input("📝 Escribe aquí tu antojo:", placeholder="Ej: Me apetece llorar un poco con un romance histórico, o quiero un misterio muy oscuro nórdico...")
+    
+    # Usamos type="primary" para que el botón destaque con color fuerte
+    if st.button("✨ Preguntar al Oráculo", type="primary"):
+        if not mood_texto:
+            st.warning("¡Escribe algo en la caja de texto para que el Oráculo pueda leer tu mente!")
+        else:
+            cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
+            if not cands_validos:
+                st.warning("No tienes libros pendientes con descripción en Notion para que Gemini los lea.")
+            else:
+                with st.spinner("🔮 El Oráculo está consultando los astros (y tus sinopsis)..."):
+                    try:
+                        gemini_api_key = st.secrets["gemini_api_key"]
+                        genai.configure(api_key=gemini_api_key)
+                        model = genai.GenerativeModel('gemini-3.6-flash')
+                        
+                        prompt = f"""
+                        Eres un oráculo literario y experto recomendador. El usuario te ha pedido recomendaciones basándose en su estado de ánimo, gusto o apetencia actual:
+                        Deseo del usuario: "{mood_texto}"
+                        
+                        CANDIDATOS DISPONIBLES EN SU ESTANTERÍA (Elige solo UNO):
+                        """
+                        for i, c in enumerate(cands_validos):
+                            prompt += f"\n[{i}] {c['titulo']} (de {c['autor_texto']})\nSinopsis: {c['descripcion']}\n"
+                            
+                        prompt += """
+                        Selecciona el ÚNICO candidato que MEJOR ENCAJE con lo que pide el usuario.
+                        Responde ÚNICAMENTE con un JSON válido usando esta estructura exacta (sin formato markdown adicional):
+                        {
+                          "indice": <numero entero del candidato elegido>,
+                          "explicacion": "<Explica de forma cautivadora por qué este libro es perfecto para lo que busca ahora mismo>"
+                        }
+                        """
+                        
+                        response = model.generate_content(
+                            prompt,
+                            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+                        )
+                        resultado = json.loads(response.text)
+                        idx_elegido = int(resultado["indice"])
+                        explicacion = resultado["explicacion"]
+                        
+                        if 0 <= idx_elegido < len(cands_validos):
+                            libro_ganador = cands_validos[idx_elegido]
+                            st.success(f"🔮 **El Oráculo ha hablado:**\n\n{formato_mensaje(libro_ganador)}\n\n✨ *Veredicto:* {explicacion}")
+                        else:
+                            st.error("El oráculo se ha confundido de libro. Inténtalo de nuevo.")
+                    except Exception as e:
+                        st.error(f"❌ Error consultando al oráculo: {e}")
 
 except Exception as e:
     st.error(f"❌ Ups, error al cargar: {e}")
