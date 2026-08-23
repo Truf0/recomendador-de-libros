@@ -7,8 +7,6 @@ st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide"
 
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
-
-# Limpiamos la clave por si se han colado espacios o comillas al pegarla en Secrets
 GEMINI_API_KEY = st.secrets.get("gemini_api_key", "").replace('"', '').replace("'", "").strip()
 
 def obtener_titulo(prop):
@@ -289,7 +287,7 @@ try:
                         3. Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3].
                         """
                         
-                       url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+                        url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
                         
                         try:
                             res = requests.post(
@@ -311,11 +309,9 @@ try:
                                 else:
                                     st.warning("La IA encontró una similitud pero dudó en el formato. ¡Vuelve a pulsar el botón!")
                             else:
-                                # ESTE ES EL CHIVATO:
                                 st.error(f"⚠️ Error de Gemini (Código {res.status_code}): {res.text}")
                         except Exception as e:
                             st.error(f"Error de conexión con el servidor: {e}")
 
 except Exception as e:
-    st.error("❌ Ups, error al cargar.")
-    st.write(e)
+    st.error(f"❌ Ups, error al cargar: {e}")
