@@ -287,7 +287,8 @@ try:
                         3. Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3].
                         """
                         
-                        url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+                        # URL corregida a la versión v1 estable
+                        url_gemini = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
                         
                         try:
                             res = requests.post(
