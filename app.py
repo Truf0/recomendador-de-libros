@@ -286,7 +286,7 @@ try:
                             genai.configure(api_key=gemini_api_key)
                             
                             # Utilizamos gemini-1.5-flash que es muy rápido y bueno analizando gran cantidad de texto
-                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            model = genai.GenerativeModel('gemini-1.5-flash-latest')
                             
                             prompt = f"""
                             Eres un experto recomendador literario. Tu objetivo es recomendar un libro de la lista de candidatos que comparta la MISMA ATMÓSFERA, vibra, o tono temático que el libro de referencia.
