@@ -276,7 +276,8 @@ try:
                     with st.spinner("🧠 Analizando la atmósfera híbrida (Géneros + Sinopsis)..."):
                         textos = [ref["descripcion"]] + [c["descripcion"] for c in cands_validos]
                         
-                        vectorizer = TfidfVectorizer(stop_words='spanish')
+                        # Vectorizador limpio sin parámetro de idioma conflictivo
+                        vectorizer = TfidfVectorizer()
                         matriz_tfidf = vectorizer.fit_transform(textos)
                         
                         similitudes_texto = cosine_similarity(matriz_tfidf[0:1], matriz_tfidf[1:]).flatten()
