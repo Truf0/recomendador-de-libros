@@ -1,11 +1,13 @@
 import streamlit as st
 import requests
 import random
+import re # Necesario para que la IA entienda los números de las listas
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
+GEMINI_API_KEY = st.secrets.get("gemini_api_key", "") # Recoge tu nueva clave
 
 def obtener_titulo(prop):
     try:
@@ -67,6 +69,14 @@ def obtener_checkbox(prop):
         return False
     return False
 
+def obtener_descripcion(prop):
+    try:
+        if prop["type"] == "rich_text" and prop["rich_text"]:
+            return "".join([t["plain_text"] for t in prop["rich_text"]])
+    except:
+        return ""
+    return ""
+
 def safe_float(val):
     try:
         return float(val)
@@ -123,6 +133,7 @@ try:
                         "colores": obtener_colores_multiselect(props.get("Color", {})),
                         "generos": obtener_ids(props.get("Género", {})),
                         "autores_ids": obtener_ids(props.get("Autor", {})),
+                        "descripcion": obtener_descripcion(props.get("Descripción", {})),
                         "es_por_terminar": False,
                         "es_ingles": obtener_checkbox(props.get("Inglés", {}))
                     }
@@ -167,7 +178,6 @@ try:
         return mensaje
 
     st.markdown("#### 🎲 Opciones Rápidas")
-    # Ahora son 4 columnas en las rápidas, incluyendo Inglés
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -176,7 +186,7 @@ try:
             a_ref = set(ref["autores_ids"])
             
             if not g_ref:
-                st.warning("El libro que has seleccionado no tiene géneros asignados.")
+                st.warning("El libro seleccionado no tiene géneros asignados.")
             else:
                 cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
                 
@@ -191,7 +201,7 @@ try:
                 elif opciones_concentradas:
                     st.success(f"🎯 **Match Concentrado (Esencia pura):**\n\n{formato_mensaje(random.choice(opciones_concentradas))}")
                 else:
-                    st.warning("No hay libros pendientes que igualen esta pureza. ¡Prueba a cambiar radicalmente!")
+                    st.warning("No hay libros pendientes que igualen esta pureza.")
 
     with col2:
         if st.button("✍️ Mismo autor", use_container_width=True):
@@ -214,7 +224,6 @@ try:
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### 🔍 Opciones Avanzadas")
-    # Y aquí dejamos 4 columnas preparadas
     col5, col6, col7, col8 = st.columns(4)
     
     with col5:
@@ -249,7 +258,66 @@ try:
 
     with col8:
         if st.button("🌫️ Misma Atmósfera", use_container_width=True):
-            st.info("🧠 **¡En construcción!** Estamos preparando la conexión con la Inteligencia Artificial para que analice las sinopsis y entienda el 'rollo' de cada historia. ¡Próximamente!")
+            if not GEMINI_API_KEY:
+                st.error("⚠️ La clave de Gemini no se ha cargado. Revisa tus Secrets de Streamlit.")
+            elif not ref.get("descripcion"):
+                st.warning("El libro que has elegido no tiene texto en la propiedad 'Descripción'.")
+            else:
+                # Filtramos solo candidatos que tengan una sinopsis razonablemente larga (más de 20 caracteres)
+                cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
+                
+                if not cands_validos:
+                    st.warning("No tienes libros pendientes con descripción en Notion para poder analizarlos.")
+                else:
+                    with st.spinner("🧠 Leyendo sinopsis para encontrar esa misma vibra..."):
+                        # Preparamos la lista para enviársela a la IA
+                        texto_cands = ""
+                        for i, c in enumerate(cands_validos):
+                            # Recortamos a 600 caracteres cada sinopsis para que la IA lea rápido la esencia
+                            texto_cands += f"[{i}] {c['titulo']} - {c['descripcion'][:600]}...\n"
+                            
+                        prompt = f"""
+                        Eres un experto recomendador de libros basado en atmósferas y tonos narrativos (misterio opresivo, aventuras ligeras, escenario aislado, etc.).
+                        
+                        Libro de referencia leído por el usuario:
+                        Título: {ref['titulo']}
+                        Sinopsis: {ref['descripcion']}
+                        
+                        Lista de candidatos pendientes:
+                        {texto_cands}
+                        
+                        Tu tarea:
+                        1. Analiza profundamente la atmósfera, el tono y la 'vibra' del libro de referencia.
+                        2. Busca en la lista de candidatos el libro que comparta la esencia narrativa o el escenario más similar.
+                        3. IMPORTANTE: Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3]. NO escribas explicaciones ni nada más.
+                        """
+                        
+                        url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+                        
+                        try:
+                            res = requests.post(
+                                url_gemini, 
+                                json={"contents": [{"parts": [{"text": prompt}]}]}, 
+                                headers={"Content-Type": "application/json"}
+                            )
+                            
+                            if res.status_code == 200:
+                                texto_respuesta = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                # Buscamos el número entre corchetes usando expresiones regulares
+                                match = re.search(r'\[(\d+)\]', texto_respuesta)
+                                
+                                if match:
+                                    idx = int(match.group(1))
+                                    if 0 <= idx < len(cands_validos):
+                                        st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia o escenario.*")
+                                    else:
+                                        st.error("Error lógico en la respuesta de la IA. Inténtalo de nuevo.")
+                                else:
+                                    st.warning("La IA encontró una similitud pero dudó en el formato. ¡Vuelve a pulsar el botón!")
+                            else:
+                                st.error("Ups, la API de Gemini ha devuelto un error al intentar leer.")
+                        except Exception as e:
+                            st.error(f"Error de conexión con el servidor: {e}")
 
 except Exception as e:
     st.error("❌ Ups, error al cargar.")
