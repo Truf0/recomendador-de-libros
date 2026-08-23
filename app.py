@@ -110,8 +110,13 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
     col1, col2 = st.columns([1, 1.5])
     
     with col1:
-        if libro.get("portada_url"):
-            st.image(libro["portada_url"], use_column_width=True)
+        url_img = libro.get("portada_url")
+        if url_img:
+            # Truco infalible: HTML nativo para evitar cuelgues en Streamlit Cloud con AWS S3
+            st.markdown(
+                f'<img src="{url_img}" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">', 
+                unsafe_allow_html=True
+            )
         else:
             st.info("🖼️ Sin portada en Notion")
             
