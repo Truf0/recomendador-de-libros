@@ -235,7 +235,7 @@ try:
             if not saga_actual:
                 st.warning("El libro seleccionado no pertenece a ninguna saga conocida.")
             else:
-                opciones = [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga"] is not None] if False else [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga") is not None]
+                opciones = [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga") is not None]
                 if opciones:
                     siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
                     st.success(f"El viaje continúa:\n\n{formato_mensaje(siguiente)}")
@@ -264,7 +264,6 @@ try:
             if not ref.get("descripcion") or len(ref.get("descripcion")) < 20:
                 st.warning("El libro seleccionado no tiene una descripción suficientemente detallada en Notion.")
             else:
-                # Filtramos candidatos que tengan descripción y descartamos al mismo autor para variar
                 a_ref = set(ref["autores_ids"])
                 cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20 and not set(p["autores_ids"]).intersection(a_ref)]
                 
@@ -282,20 +281,15 @@ try:
                         
                         similitudes_texto = cosine_similarity(matriz_tfidf[0:1], matriz_tfidf[1:]).flatten()
                         
-                        # Sistema de puntuación híbrido: Combinamos la similitud de la sinopsis + afinidad de géneros
                         g_ref = set(ref["generos"])
                         puntuaciones_finales = []
                         
                         for idx, c in enumerate(cands_validos):
                             g_cand = set(c["generos"])
-                            # Cuántos géneros comparten
                             coincidencia_generos = len(g_ref.intersection(g_cand))
-                            
-                            # Puntuación final: Damos peso a los géneros para que acoten y a la sinopsis para afinar la atmósfera
                             score = (coincidencia_generos * 0.5) + (similitudes_texto[idx] * 1.5)
                             puntuaciones_finales.append(score)
                         
-                        # Buscamos el mejor índice ponderado
                         mejor_idx = max(range(len(puntuaciones_finales)), key=lambda i: puntuaciones_finales[i])
                         mejor_puntuacion = puntuaciones_finales[mejor_idx]
                         
