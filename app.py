@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 import random
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import json
+import google.generativeai as genai
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
@@ -260,7 +260,7 @@ try:
             else: st.warning("No hay libros con esta paleta.")
 
     with col8:
-        if st.button("🌫️ Misma Atmósfera", use_container_width=True):
+        if st.button("🌫️ Misma Atmósfera (con Gemini ✨)", use_container_width=True):
             if not ref.get("descripcion") or len(ref.get("descripcion")) < 20:
                 st.warning("El libro seleccionado no tiene una descripción suficientemente detallada en Notion.")
             else:
@@ -273,32 +273,65 @@ try:
                 if not cands_validos:
                     st.warning("No tienes libros pendientes con descripción en Notion para poder analizarlos.")
                 else:
-                    with st.spinner("🧠 Analizando la atmósfera híbrida (Géneros + Sinopsis)..."):
-                        textos = [ref["descripcion"]] + [c["descripcion"] for c in cands_validos]
-                        
-                        # Vectorizador limpio sin parámetro de idioma conflictivo
-                        vectorizer = TfidfVectorizer()
-                        matriz_tfidf = vectorizer.fit_transform(textos)
-                        
-                        similitudes_texto = cosine_similarity(matriz_tfidf[0:1], matriz_tfidf[1:]).flatten()
-                        
-                        g_ref = set(ref["generos"])
-                        puntuaciones_finales = []
-                        
-                        for idx, c in enumerate(cands_validos):
-                            g_cand = set(c["generos"])
-                            coincidencia_generos = len(g_ref.intersection(g_cand))
-                            score = (coincidencia_generos * 0.5) + (similitudes_texto[idx] * 1.5)
-                            puntuaciones_finales.append(score)
-                        
-                        mejor_idx = max(range(len(puntuaciones_finales)), key=lambda i: puntuaciones_finales[i])
-                        mejor_puntuacion = puntuaciones_finales[mejor_idx]
-                        
-                        if mejor_puntuacion > 0.02:
-                            libro_ganador = cands_validos[mejor_idx]
-                            st.success(f"🧠 **Match por Atmósfera (Motor Híbrido):**\n\n{formato_mensaje(libro_ganador)}\n\n*Cruzando géneros y sinopsis para clavar la misma vibra narrativa.*")
-                        else:
-                            st.warning("No se ha encontrado un libro pendiente con una atmósfera o temática similar.")
+                    with st.spinner("🧠 Gemini está analizando las atmósferas..."):
+                        try:
+                            # Intentar obtener la API key de los secrets
+                            try:
+                                gemini_api_key = st.secrets["gemini_api_key"]
+                            except KeyError:
+                                st.error("⚠️ Falta la clave 'gemini_api_key' en tus secrets de Streamlit. Añádela para usar el cerebro de Gemini.")
+                                st.stop()
+                                
+                            # Configuración del modelo
+                            genai.configure(api_key=gemini_api_key)
+                            
+                            # Utilizamos gemini-1.5-flash que es muy rápido y bueno analizando gran cantidad de texto
+                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            
+                            prompt = f"""
+                            Eres un experto recomendador literario. Tu objetivo es recomendar un libro de la lista de candidatos que comparta la MISMA ATMÓSFERA, vibra, o tono temático que el libro de referencia.
+                            Por ejemplo, si el de referencia es sobre "secretos familiares en un entorno natural asfixiante", busca algo con una sensación similar en los candidatos, aunque la trama específica sea distinta.
+
+                            LIBRO DE REFERENCIA (El que el usuario ya leyó y le gustó su atmósfera):
+                            - Título: {ref['titulo']}
+                            - Autor: {ref['autor_texto']}
+                            - Sinopsis: {ref['descripcion']}
+
+                            CANDIDATOS (Elige solo UNO):
+                            """
+                            
+                            for i, c in enumerate(cands_validos):
+                                prompt += f"\n[{i}] {c['titulo']} (de {c['autor_texto']})\nSinopsis: {c['descripcion']}\n"
+                            
+                            prompt += """
+                            Analiza profundamente las atmósferas. Selecciona el candidato que mejor encaje.
+                            Responde ÚNICAMENTE con un JSON válido usando esta estructura exacta (sin formato markdown adicional, solo el JSON):
+                            {
+                              "indice": <numero entero del candidato elegido>,
+                              "explicacion": "<Tu explicación corta de por qué las atmósferas y tonos son similares>"
+                            }
+                            """
+                            
+                            # Solicitamos salida estructurada en JSON
+                            response = model.generate_content(
+                                prompt,
+                                generation_config=genai.GenerationConfig(
+                                    response_mime_type="application/json"
+                                )
+                            )
+                            
+                            resultado = json.loads(response.text)
+                            idx_elegido = int(resultado["indice"])
+                            explicacion = resultado["explicacion"]
+                            
+                            if 0 <= idx_elegido < len(cands_validos):
+                                libro_ganador = cands_validos[idx_elegido]
+                                st.success(f"🧠 **Recomendación de Gemini:**\n\n{formato_mensaje(libro_ganador)}\n\n✨ *¿Por qué lo recomiendo?* {explicacion}")
+                            else:
+                                st.error("Gemini devolvió un índice inválido. Inténtalo de nuevo.")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Ha ocurrido un error al consultar a Gemini: {e}")
 
 except Exception as e:
     st.error(f"❌ Ups, error al cargar: {e}")
