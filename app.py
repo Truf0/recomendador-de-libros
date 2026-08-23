@@ -67,14 +67,12 @@ def obtener_checkbox(prop):
         return False
     return False
 
-# Función clave para no saltarse libros de una saga
 def safe_float(val):
     try:
         return float(val)
     except:
         return 9999.0
 
-# Esta función filtra una lista de libros y devuelve SOLO el primer libro disponible de cada saga
 def primeras_de_saga(lista_candidatos):
     sagas = {}
     for libro in lista_candidatos:
@@ -175,9 +173,28 @@ try:
         if st.button("🔮 Mismo género", use_container_width=True):
             g_ref = set(ref["generos"])
             a_ref = set(ref["autores_ids"])
-            opciones = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref) and len(g_ref.intersection(set(p["generos"]))) >= 1]
-            if opciones: st.success(formato_mensaje(random.choice(opciones)))
-            else: st.warning("No hay coincidencias de género.")
+            
+            if not g_ref:
+                st.warning("El libro que has seleccionado no tiene géneros asignados para poder comparar.")
+            else:
+                # Quitamos los que son del mismo autor (la idea es variar la pluma)
+                cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
+                
+                # Nivel 1: Igualdad total
+                opciones_exactas = [p for p in cands if set(p["generos"]) == g_ref]
+                # Nivel 2: Tiene todo lo tuyo + algún género extra
+                opciones_expandidas = [p for p in cands if g_ref.issubset(set(p["generos"])) and set(p["generos"]) != g_ref]
+                # Nivel 3: Tiene algunos de tus géneros, pero NO tiene géneros "intrusos"
+                opciones_concentradas = [p for p in cands if set(p["generos"]).issubset(g_ref) and len(set(p["generos"])) > 0 and set(p["generos"]) != g_ref]
+                
+                if opciones_exactas:
+                    st.success(f"🔥 **Match Exacto (100% pureza):**\n\n{formato_mensaje(random.choice(opciones_exactas))}")
+                elif opciones_expandidas:
+                    st.success(f"✨ **Match Expandido (Tus géneros + un toque extra):**\n\n{formato_mensaje(random.choice(opciones_expandidas))}")
+                elif opciones_concentradas:
+                    st.success(f"🎯 **Match Concentrado (Esencia pura):**\n\n{formato_mensaje(random.choice(opciones_concentradas))}")
+                else:
+                    st.warning("No hay libros pendientes que igualen la pureza de estos géneros. ¡Prueba a cambiar radicalmente!")
 
     with col2:
         if st.button("✍️ Mismo autor", use_container_width=True):
@@ -190,7 +207,7 @@ try:
         if st.button("🔄 Cambio radical", use_container_width=True):
             opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
             if opciones: st.success(f"Rompe con todo:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("¡Añade más variedad!")
+            else: st.warning("¡Añade más variedad a tus pendientes!")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### 🔍 Opciones Avanzadas")
@@ -204,7 +221,6 @@ try:
             else:
                 opciones = [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga") is not None]
                 if opciones:
-                    # Matemáticamente elegimos el número de saga más bajo que te queda por leer
                     siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
                     st.success(f"El viaje continúa:\n\n{formato_mensaje(siguiente)}")
                 else:
@@ -213,9 +229,7 @@ try:
     with col5:
         if st.button("📚 Saga Similar", use_container_width=True):
             g_ref = set(ref["generos"])
-            # Buscamos libros que pertenezcan a OTRA saga y compartan género
             candidatos_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(g_ref.intersection(set(p["generos"]))) >= 1]
-            # Extraemos matemáticamente solo los inicios disponibles de cada saga
             opciones_inicio = primeras_de_saga(candidatos_saga)
             if opciones_inicio:
                 st.success(f"Empieza una nueva aventura:\n\n{formato_mensaje(random.choice(opciones_inicio))}")
