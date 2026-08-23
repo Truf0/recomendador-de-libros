@@ -10,7 +10,6 @@ NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
 GEMINI_API_KEY = st.secrets.get("gemini_api_key", "").replace('"', '').replace("'", "").strip()
 
-# Configuramos la IA oficialmente
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
@@ -282,7 +281,7 @@ try:
                             texto_cands += f"[{i}] {c['titulo']} - {c['descripcion'][:600]}...\n"
                             
                         prompt = f"""
-                        Eres un experto recomendador de libros basado en atmósferas y tonos narrativos (misterio opresivo, escenarios cerrados, etc.).
+                        Eres un experto recomendador de libros basado en atmósferas y tonos narrativos.
                         
                         Libro de referencia leído por el usuario:
                         Título: {ref['titulo']}
@@ -293,13 +292,13 @@ try:
                         
                         Tu tarea:
                         1. Analiza la atmósfera, el tono y la 'vibra' del libro de referencia.
-                        2. Busca en la lista el candidato que comparta la esencia narrativa o el escenario más similar.
+                        2. Busca en la lista el candidato que comparta la esencia narrativa.
                         3. Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3].
                         """
                         
                         try:
-                            # Modelo oficial gemini-pro (100% compatible y estable)
-                            model = genai.GenerativeModel('gemini-pro')
+                            # Usamos el modelo oficial actual con la librería de Google
+                            model = genai.GenerativeModel('gemini-1.5-flash')
                             respuesta_ia = model.generate_content(prompt)
                             texto_respuesta = respuesta_ia.text.strip()
                             
@@ -308,7 +307,7 @@ try:
                             if match:
                                 idx = int(match.group(1))
                                 if 0 <= idx < len(cands_validos):
-                                    st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia y vibra.*")
+                                    st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia.*")
                                 else:
                                     st.error("Error lógico en la respuesta de la IA. Inténtalo de nuevo.")
                             else:
