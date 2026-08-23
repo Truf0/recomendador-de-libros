@@ -108,7 +108,7 @@ try:
     por_terminar = []
     pendientes = []
     diccionario_libros = {}
-    autores_leidos_ids = set() # <-- MEMORIA PARA "SANGRE NUEVA"
+    autores_leidos_ids = set() 
     
     with st.spinner('Cargando estantería completa...'):
         has_more = True
@@ -149,7 +149,6 @@ try:
                     
                     if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
                         leidos.append(nombre_visual)
-                        # Guardamos los IDs de los autores que ya has leído
                         for a_id in info_libro["autores_ids"]:
                             autores_leidos_ids.add(a_id)
                     elif "por terminar" in estado:
@@ -281,7 +280,8 @@ try:
                         try:
                             gemini_api_key = st.secrets["gemini_api_key"]
                             genai.configure(api_key=gemini_api_key)
-                            model = genai.GenerativeModel('gemini-3.6-flash')
+                            # --- CAMBIO AL MODELO LITE ---
+                            model = genai.GenerativeModel('gemini-3.5-flash-lite')
                             
                             prompt = f"""
                             Eres un experto recomendador literario. Tu objetivo es recomendar un libro de los candidatos que comparta la MISMA ATMÓSFERA, vibra, o tono temático que el libro de referencia.
@@ -319,7 +319,6 @@ try:
                         except Exception as e:
                             st.error(f"❌ Ha ocurrido un error al consultar a Gemini: {e}")
 
-    # --- NUEVA SECCIÓN: SANGRE NUEVA Y RULETA RUSA ---
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### 💥 Nuevas Emociones")
     col9, col10 = st.columns(2)
@@ -339,14 +338,12 @@ try:
             else:
                 st.warning("No te quedan libros pendientes. ¡Hora de ir de compras!")
 
-    # --- NUEVA SECCIÓN: EL ORÁCULO DE GEMINI (MOOD READER) ---
     st.markdown("---")
     st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
     st.write("¿No sabes qué leer hoy? Olvídate de filtros y botones. Cuéntale a la Inteligencia Artificial cómo te sientes o qué te apetece y ella rebuscará en tus pendientes para darte el libro perfecto.")
     
     mood_texto = st.text_input("📝 Escribe aquí tu antojo:", placeholder="Ej: Me apetece llorar un poco con un romance histórico, o quiero un misterio muy oscuro nórdico...")
     
-    # Usamos type="primary" para que el botón destaque con color fuerte
     if st.button("✨ Preguntar al Oráculo", type="primary"):
         if not mood_texto:
             st.warning("¡Escribe algo en la caja de texto para que el Oráculo pueda leer tu mente!")
@@ -359,7 +356,8 @@ try:
                     try:
                         gemini_api_key = st.secrets["gemini_api_key"]
                         genai.configure(api_key=gemini_api_key)
-                        model = genai.GenerativeModel('gemini-3.6-flash')
+                        # --- CAMBIO AL MODELO LITE ---
+                        model = genai.GenerativeModel('gemini-3.5-flash-lite')
                         
                         prompt = f"""
                         Eres un oráculo literario y experto recomendador. El usuario te ha pedido recomendaciones basándose en su estado de ánimo, gusto o apetencia actual:
