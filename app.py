@@ -235,7 +235,7 @@ try:
             if not saga_actual:
                 st.warning("El libro seleccionado no pertenece a ninguna saga conocida.")
             else:
-                opciones = [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga") is not None]
+                opciones = [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga"] is not None] if False else [p for p in candidatos if p.get("saga_texto") == saga_actual and p.get("numero_saga") is not None]
                 if opciones:
                     siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
                     st.success(f"El viaje continúa:\n\n{formato_mensaje(siguiente)}")
@@ -264,31 +264,46 @@ try:
             if not ref.get("descripcion") or len(ref.get("descripcion")) < 20:
                 st.warning("El libro seleccionado no tiene una descripción suficientemente detallada en Notion.")
             else:
-                cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
+                # Filtramos candidatos que tengan descripción y descartamos al mismo autor para variar
+                a_ref = set(ref["autores_ids"])
+                cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20 and not set(p["autores_ids"]).intersection(a_ref)]
+                
+                if not cands_validos:
+                    cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
                 
                 if not cands_validos:
                     st.warning("No tienes libros pendientes con descripción en Notion para poder analizarlos.")
                 else:
-                    with st.spinner("🧠 Analizando la atmósfera temática de las sinopsis..."):
-                        # Preparamos los textos: el primero es la referencia, los siguientes los candidatos
+                    with st.spinner("🧠 Analizando la atmósfera híbrida (Géneros + Sinopsis)..."):
                         textos = [ref["descripcion"]] + [c["descripcion"] for c in cands_validos]
                         
-                        # Vectorizamos las descripciones matemáticamente
-                        vectorizer = TfidfVectorizer()
+                        vectorizer = TfidfVectorizer(stop_words='spanish')
                         matriz_tfidf = vectorizer.fit_transform(textos)
                         
-                        # Calculamos la similitud del libro de referencia con respecto a todos los candidatos
-                        similitudes = cosine_similarity(matriz_tfidf[0:1], matriz_tfidf[1:]).flatten()
+                        similitudes_texto = cosine_similarity(matriz_tfidf[0:1], matriz_tfidf[1:]).flatten()
                         
-                        # Buscamos el índice del candidato con mayor similitud atmosférica/temática
-                        mejor_idx = similitudes.argmax()
-                        mejor_puntuacion = similitudes[mejor_idx]
+                        # Sistema de puntuación híbrido: Combinamos la similitud de la sinopsis + afinidad de géneros
+                        g_ref = set(ref["generos"])
+                        puntuaciones_finales = []
                         
-                        if mejor_puntuacion > 0.05:  # Umbral mínimo de coincidencia
+                        for idx, c in enumerate(cands_validos):
+                            g_cand = set(c["generos"])
+                            # Cuántos géneros comparten
+                            coincidencia_generos = len(g_ref.intersection(g_cand))
+                            
+                            # Puntuación final: Damos peso a los géneros para que acoten y a la sinopsis para afinar la atmósfera
+                            score = (coincidencia_generos * 0.5) + (similitudes_texto[idx] * 1.5)
+                            puntuaciones_finales.append(score)
+                        
+                        # Buscamos el mejor índice ponderado
+                        mejor_idx = max(range(len(puntuaciones_finales)), key=lambda i: puntuaciones_finales[i])
+                        mejor_puntuacion = puntuaciones_finales[mejor_idx]
+                        
+                        if mejor_puntuacion > 0.02:
                             libro_ganador = cands_validos[mejor_idx]
-                            st.success(f"🧠 **Match por Atmósfera detectado (Análisis temático):**\n\n{formato_mensaje(libro_ganador)}\n\n*Las sinopsis comparten similitudes notables en vocabularies y temas narrativos.*")
+                            st.success(f"🧠 **Match por Atmósfera (Motor Híbrido):**\n\n{formato_mensaje(libro_ganador)}\n\n*Cruzando géneros y sinopsis para clavar la misma vibra narrativa.*")
                         else:
-                            st.warning("No se ha encontrado un libro pendiente con una atmósfera o temática similar en las descripciones.")
+                            st.warning("No se ha encontrado un libro pendiente con una atmósfera o temática similar.")
 
 except Exception as e:
     st.error(f"❌ Ups, error al cargar: {e}")
