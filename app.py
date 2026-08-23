@@ -167,7 +167,8 @@ try:
         return mensaje
 
     st.markdown("#### 🎲 Opciones Rápidas")
-    col1, col2, col3 = st.columns(3)
+    # Ahora son 4 columnas en las rápidas, incluyendo Inglés
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         if st.button("🔮 Mismo género", use_container_width=True):
@@ -175,16 +176,12 @@ try:
             a_ref = set(ref["autores_ids"])
             
             if not g_ref:
-                st.warning("El libro que has seleccionado no tiene géneros asignados para poder comparar.")
+                st.warning("El libro que has seleccionado no tiene géneros asignados.")
             else:
-                # Quitamos los que son del mismo autor (la idea es variar la pluma)
                 cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
                 
-                # Nivel 1: Igualdad total
                 opciones_exactas = [p for p in cands if set(p["generos"]) == g_ref]
-                # Nivel 2: Tiene todo lo tuyo + algún género extra
                 opciones_expandidas = [p for p in cands if g_ref.issubset(set(p["generos"])) and set(p["generos"]) != g_ref]
-                # Nivel 3: Tiene algunos de tus géneros, pero NO tiene géneros "intrusos"
                 opciones_concentradas = [p for p in cands if set(p["generos"]).issubset(g_ref) and len(set(p["generos"])) > 0 and set(p["generos"]) != g_ref]
                 
                 if opciones_exactas:
@@ -194,7 +191,7 @@ try:
                 elif opciones_concentradas:
                     st.success(f"🎯 **Match Concentrado (Esencia pura):**\n\n{formato_mensaje(random.choice(opciones_concentradas))}")
                 else:
-                    st.warning("No hay libros pendientes que igualen la pureza de estos géneros. ¡Prueba a cambiar radicalmente!")
+                    st.warning("No hay libros pendientes que igualen esta pureza. ¡Prueba a cambiar radicalmente!")
 
     with col2:
         if st.button("✍️ Mismo autor", use_container_width=True):
@@ -208,12 +205,19 @@ try:
             opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
             if opciones: st.success(f"Rompe con todo:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("¡Añade más variedad a tus pendientes!")
+            
+    with col4:
+        if st.button("🇬🇧 En Inglés", use_container_width=True):
+            opciones = [p for p in candidatos if p.get("es_ingles", False)]
+            if opciones: st.success(f"Para tu reto de lectura:\n\n{formato_mensaje(random.choice(opciones))}")
+            else: st.warning("No tienes libros pendientes marcados en inglés.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### 🔍 Opciones Avanzadas")
-    col4, col5, col6, col7 = st.columns(4)
+    # Y aquí dejamos 4 columnas preparadas
+    col5, col6, col7, col8 = st.columns(4)
     
-    with col4:
+    with col5:
         if st.button("🔗 Continuar Saga", use_container_width=True):
             saga_actual = ref.get("saga_texto")
             if not saga_actual:
@@ -224,9 +228,9 @@ try:
                     siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
                     st.success(f"El viaje continúa:\n\n{formato_mensaje(siguiente)}")
                 else:
-                    st.warning("¡Felicidades! Estás al día con esta saga (o no tienes las continuaciones en pendientes).")
+                    st.warning("¡Felicidades! Estás al día con esta saga.")
                     
-    with col5:
+    with col6:
         if st.button("📚 Saga Similar", use_container_width=True):
             g_ref = set(ref["generos"])
             candidatos_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(g_ref.intersection(set(p["generos"]))) >= 1]
@@ -236,18 +240,16 @@ try:
             else:
                 st.warning("No hay nuevas sagas de este género listas para empezar.")
 
-    with col6:
+    with col7:
         if st.button("🎨 Buscar por Color", use_container_width=True):
             c_ref = set(ref.get("colores", []))
             opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
             if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
             else: st.warning("No hay libros con esta paleta.")
 
-    with col7:
-        if st.button("🇬🇧 En Inglés", use_container_width=True):
-            opciones = [p for p in candidatos if p.get("es_ingles", False)]
-            if opciones: st.success(f"Para tu reto de lectura:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("No tienes libros pendientes marcados en inglés.")
+    with col8:
+        if st.button("🌫️ Misma Atmósfera", use_container_width=True):
+            st.info("🧠 **¡En construcción!** Estamos preparando la conexión con la Inteligencia Artificial para que analice las sinopsis y entienda el 'rollo' de cada historia. ¡Próximamente!")
 
 except Exception as e:
     st.error("❌ Ups, error al cargar.")
