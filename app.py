@@ -2,12 +2,17 @@ import streamlit as st
 import requests
 import random
 import re
+import google.generativeai as genai  # <-- La librería oficial y definitiva
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
 GEMINI_API_KEY = st.secrets.get("gemini_api_key", "").replace('"', '').replace("'", "").strip()
+
+# Configuramos la IA oficialmente
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 def obtener_titulo(prop):
     try:
@@ -116,7 +121,6 @@ try:
             payload = {"page_size": 100}
             if next_cursor: payload["start_cursor"] = next_cursor
             
-            # Añadido timeout de 15 segundos para evitar bloqueos con Notion
             try:
                 respuesta = requests.post(url, headers=headers, json=payload, timeout=15)
             except requests.exceptions.Timeout:
@@ -293,35 +297,24 @@ try:
                         3. Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3].
                         """
                         
-                        url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
-                        
                         try:
-                            # Añadido timeout de 20 segundos para la IA
-                            res = requests.post(
-                                url_gemini, 
-                                json={"contents": [{"parts": [{"text": prompt}]}]}, 
-                                headers={"Content-Type": "application/json"},
-                                timeout=20
-                            )
+                            # Llamada ultra limpia con la librería oficial
+                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            respuesta_ia = model.generate_content(prompt)
+                            texto_respuesta = respuesta_ia.text.strip()
                             
-                            if res.status_code == 200:
-                                texto_respuesta = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                match = re.search(r'\[(\d+)\]', texto_respuesta)
-                                
-                                if match:
-                                    idx = int(match.group(1))
-                                    if 0 <= idx < len(cands_validos):
-                                        st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia.*")
-                                    else:
-                                        st.error("Error lógico en la respuesta de la IA. Inténtalo de nuevo.")
+                            match = re.search(r'\[(\d+)\]', texto_respuesta)
+                            
+                            if match:
+                                idx = int(match.group(1))
+                                if 0 <= idx < len(cands_validos):
+                                    st.success(f"🧠 **Match por Atmósfera detectado:**\n\n{formato_mensaje(cands_validos[idx])}\n\n*La IA ha cruzado las sinopsis y comparten la misma esencia.*")
                                 else:
-                                    st.warning("La IA encontró una similitud pero dudó en el formato. ¡Vuelve a pulsar el botón!")
+                                    st.error("Error lógico en la respuesta de la IA. Inténtalo de nuevo.")
                             else:
-                                st.error(f"⚠️ Error de Gemini (Código {res.status_code}): {res.text}")
-                        except requests.exceptions.Timeout:
-                            st.error("⚠️ La IA ha tardado demasiado en responder. Vuelve a intentarlo.")
+                                st.warning("La IA encontró una similitud pero dudó en el formato. ¡Vuelve a pulsar el botón!")
                         except Exception as e:
-                            st.error(f"Error de conexión con el servidor: {e}")
+                            st.error(f"Error al conectar con el cerebro de la IA: {e}")
 
 except Exception as e:
     st.error(f"❌ Ups, error al cargar: {e}")
