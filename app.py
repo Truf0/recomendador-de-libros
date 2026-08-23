@@ -116,7 +116,13 @@ try:
             payload = {"page_size": 100}
             if next_cursor: payload["start_cursor"] = next_cursor
             
-            respuesta = requests.post(url, headers=headers, json=payload)
+            # Añadido timeout de 15 segundos para evitar bloqueos con Notion
+            try:
+                respuesta = requests.post(url, headers=headers, json=payload, timeout=15)
+            except requests.exceptions.Timeout:
+                st.error("⚠️ La conexión con Notion está tardando demasiado. Vuelve a recargar.")
+                st.stop()
+                
             if respuesta.status_code == 200:
                 datos = respuesta.json()
                 for libro in datos.get("results", []):
@@ -245,7 +251,7 @@ try:
             if opciones_inicio:
                 st.success(f"Empieza una nueva aventura:\n\n{formato_mensaje(random.choice(opciones_inicio))}")
             else:
-                st.warning("No hay nuevas sagas de هذا género listas para empezar.")
+                st.warning("No hay nuevas sagas de este género listas para empezar.")
 
     with col7:
         if st.button("🎨 Buscar por Color", use_container_width=True):
@@ -287,14 +293,15 @@ try:
                         3. Responde ÚNICAMENTE con el número entre corchetes del libro elegido. Ejemplo: [3].
                         """
                         
-                        # URL con gemini-pro y v1beta asegurados y limpios
                         url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
                         
                         try:
+                            # Añadido timeout de 20 segundos para la IA
                             res = requests.post(
                                 url_gemini, 
                                 json={"contents": [{"parts": [{"text": prompt}]}]}, 
-                                headers={"Content-Type": "application/json"}
+                                headers={"Content-Type": "application/json"},
+                                timeout=20
                             )
                             
                             if res.status_code == 200:
@@ -311,6 +318,8 @@ try:
                                     st.warning("La IA encontró una similitud pero dudó en el formato. ¡Vuelve a pulsar el botón!")
                             else:
                                 st.error(f"⚠️ Error de Gemini (Código {res.status_code}): {res.text}")
+                        except requests.exceptions.Timeout:
+                            st.error("⚠️ La IA ha tardado demasiado en responder. Vuelve a intentarlo.")
                         except Exception as e:
                             st.error(f"Error de conexión con el servidor: {e}")
 
