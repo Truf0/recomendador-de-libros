@@ -53,7 +53,7 @@ def obtener_numero(prop):
         return None
     return None
 
-def obtener_colores_multiselect(prop):
+def obtener_multiselect(prop):
     try:
         if prop["type"] == "multi_select":
             return [c["name"] for c in prop["multi_select"]]
@@ -136,7 +136,9 @@ try:
                         "autor_texto": obtener_texto_formula(props.get("Texto Autor", {})),
                         "saga_texto": obtener_texto_formula(props.get("Texto Saga", {})),
                         "numero_saga": obtener_numero(props.get("Nº Saga", {})),
-                        "colores": obtener_colores_multiselect(props.get("Color", {})),
+                        "colores": obtener_multiselect(props.get("Color", {})),
+                        "ritmos": obtener_multiselect(props.get("Ritmo", {})), # NUEVO
+                        "tonos": obtener_multiselect(props.get("Tono", {})),   # NUEVO
                         "generos": obtener_ids(props.get("Género", {})),
                         "autores_ids": obtener_ids(props.get("Autor", {})),
                         "descripcion": obtener_descripcion(props.get("Descripción", {})),
@@ -260,7 +262,7 @@ try:
             c_ref = set(ref.get("colores", []))
             opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(c_ref)]
             if opciones: st.success(f"Estética compartida:\n\n{formato_mensaje(random.choice(opciones))}")
-            else: st.warning("No hay libros con esta paleta.")
+            else: st.warning("No hay libros pendientes con esta paleta de colores.")
 
     with col8:
         if st.button("🌫️ Misma Atmósfera (Gemini ✨)", use_container_width=True):
@@ -280,7 +282,6 @@ try:
                         try:
                             gemini_api_key = st.secrets["gemini_api_key"]
                             genai.configure(api_key=gemini_api_key)
-                            # --- CAMBIO AL MODELO LITE ---
                             model = genai.GenerativeModel('gemini-3.5-flash-lite')
                             
                             prompt = f"""
@@ -319,12 +320,13 @@ try:
                         except Exception as e:
                             st.error(f"❌ Ha ocurrido un error al consultar a Gemini: {e}")
 
+    # --- NUEVA SECCIÓN: SENSACIONES Y DESCUBRIMIENTOS ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 💥 Nuevas Emociones")
-    col9, col10 = st.columns(2)
+    st.markdown("#### 💥 Nuevas Emociones y Sensaciones")
+    col9, col10, col11, col12 = st.columns(4)
     
     with col9:
-        if st.button("🩸 Sangre Nueva (Autor Inédito)", use_container_width=True):
+        if st.button("🩸 Sangre Nueva", help="Un autor que nunca hayas leído", use_container_width=True):
             opciones = [p for p in candidatos if not any(a_id in autores_leidos_ids for a_id in p["autores_ids"])]
             if opciones: 
                 st.success(f"Explora nuevos horizontes con esta pluma inédita para ti:\n\n{formato_mensaje(random.choice(opciones))}")
@@ -332,17 +334,42 @@ try:
                 st.warning("¡Vaya! Parece que ya has catado a todos los autores de tus pendientes.")
                 
     with col10:
-        if st.button("🎲 La Ruleta Rusa", use_container_width=True):
+        if st.button("🎲 Ruleta Rusa", help="Selección 100% aleatoria", use_container_width=True):
             if candidatos:
                 st.success(f"La suerte está echada. No pienses, te toca leer:\n\n{formato_mensaje(random.choice(candidatos))}")
             else:
                 st.warning("No te quedan libros pendientes. ¡Hora de ir de compras!")
 
+    with col11:
+        if st.button("⏱️ Mismo Ritmo", help="Basado en la velocidad de la historia", use_container_width=True):
+            r_ref = set(ref.get("ritmos", []))
+            if not r_ref:
+                st.warning("El libro que has seleccionado arriba no tiene ningún 'Ritmo' asignado en Notion todavía.")
+            else:
+                opciones = [p for p in candidatos if set(p.get("ritmos", [])).intersection(r_ref)]
+                if opciones: 
+                    st.success(f"Al mismo compás ({', '.join(r_ref)}):\n\n{formato_mensaje(random.choice(opciones))}")
+                else: 
+                    st.warning("No te quedan libros pendientes con este mismo ritmo.")
+
+    with col12:
+        if st.button("🎭 Mismo Tono", help="Basado en la emoción y la vibra", use_container_width=True):
+            t_ref = set(ref.get("tonos", []))
+            if not t_ref:
+                st.warning("El libro que has seleccionado arriba no tiene ningún 'Tono' asignado en Notion todavía.")
+            else:
+                opciones = [p for p in candidatos if set(p.get("tonos", [])).intersection(t_ref)]
+                if opciones: 
+                    st.success(f"Con la misma vibra ({', '.join(t_ref)}):\n\n{formato_mensaje(random.choice(opciones))}")
+                else: 
+                    st.warning("No te quedan libros pendientes con este tono.")
+
+    # --- EL ORÁCULO DE GEMINI (MOOD READER) ---
     st.markdown("---")
     st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
-    st.write("¿No sabes qué leer hoy? Olvídate de filtros y botones. Cuéntale a la Inteligencia Artificial cómo te sientes o qué te apetece y ella rebuscará en tus pendientes para darte el libro perfecto.")
+    st.write("¿No sabes qué leer hoy? Olvídate de filtros. Cuéntale a la Inteligencia Artificial cómo te sientes o qué te apetece y ella buscará el libro perfecto.")
     
-    mood_texto = st.text_input("📝 Escribe aquí tu antojo:", placeholder="Ej: Me apetece llorar un poco con un romance histórico, o quiero un misterio muy oscuro nórdico...")
+    mood_texto = st.text_input("📝 Escribe aquí tu antojo:", placeholder="Ej: Me apetece llorar con un romance histórico, o quiero misterio muy oscuro nórdico...")
     
     if st.button("✨ Preguntar al Oráculo", type="primary"):
         if not mood_texto:
@@ -356,7 +383,6 @@ try:
                     try:
                         gemini_api_key = st.secrets["gemini_api_key"]
                         genai.configure(api_key=gemini_api_key)
-                        # --- CAMBIO AL MODELO LITE ---
                         model = genai.GenerativeModel('gemini-3.5-flash-lite')
                         
                         prompt = f"""
