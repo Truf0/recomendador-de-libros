@@ -371,7 +371,6 @@ try:
                     if opciones: mostrar_popup(random.choice(opciones), f"Con la misma vibra ({', '.join(t_ref)}):")
                     else: st.warning("No hay pendientes con este tono.")
 
-        st.markdown("<br>", unsafe_allow_html=True)
         col13, col14, col15, col16 = st.columns(4)
         with col13:
             if st.button("🗣️ Mismo Narrador", use_container_width=True):
