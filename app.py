@@ -31,21 +31,18 @@ div.stButton > button:hover {
 """, unsafe_allow_html=True)
 
 # --- BÚSQUEDA AUTOMÁTICA DE TU IMAGEN ---
-# Busca cualquier archivo que contenga la palabra "fondo", ignorando mayúsculas/extensiones
 def obtener_imagen_fondo():
     for archivo in os.listdir():
         if "fondo" in archivo.lower():
             try:
                 with open(archivo, "rb") as img_file:
                     b64 = base64.b64encode(img_file.read()).decode()
-                # Detectar si es PNG o JPG automáticamente
                 mime = "image/png" if archivo.lower().endswith(".png") else "image/jpeg"
                 return f"data:{mime};base64,{b64}"
             except:
                 return None
     return None
 
-# Carga tu foto, y si por algún motivo no la encuentra, pone una de repuesto para que no quede feo
 fondo_url = obtener_imagen_fondo() or "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=80"
 
 # --- EL BANNER ---
@@ -200,6 +197,10 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
         if libro.get("ritmos"): tags.append(f"⏱️ {libro['ritmos'][0]}")
         if libro.get("tonos"): tags.append(f"🎭 {libro['tonos'][0]}")
         if libro.get("narradores"): tags.append(f"🗣️ {libro['narradores'][0]}")
+        
+        # AQUI AÑADIMOS LA BANDERA SI ES INGLÉS
+        if libro.get("es_ingles"): tags.append("🇬🇧 Inglés")
+            
         if tags: st.caption(" | ".join(tags))
             
         if libro.get("descripcion"):
@@ -307,6 +308,10 @@ try:
         if ref.get("ritmos"): tags_ref.append(f"⏱️ {ref['ritmos'][0]}")
         if ref.get("tonos"): tags_ref.append(f"🎭 {ref['tonos'][0]}")
         if ref.get("narradores"): tags_ref.append(f"🗣️ {ref['narradores'][0]}")
+        
+        # AQUI TAMBIÉN AÑADIMOS LA BANDERA SI ES INGLÉS EN EL ESCAPARATE
+        if ref.get("es_ingles"): tags_ref.append("🇬🇧 Inglés")
+            
         if tags_ref: st.caption(" | ".join(tags_ref))
             
         if ref.get("descripcion"):
