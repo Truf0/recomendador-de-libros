@@ -6,6 +6,43 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
+# === 🎨 MAGIA ESTÉTICA (CSS) ===
+st.markdown("""
+<style>
+/* 1. Importar tipografías de Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Nunito:wght@400;700&display=swap');
+
+/* 2. Cambiar la letra de la web */
+html, body, [class*="css"] {
+    font-family: 'Nunito', sans-serif;
+}
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Lora', serif !important;
+    color: #e5a93d !important; /* Tono dorado elegante para títulos */
+}
+
+/* 3. Estilo Premium para las tarjetas de Estadísticas */
+div[data-testid="metric-container"] {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+/* 4. Efecto de brillo en los botones al pasar el ratón */
+div.stButton > button {
+    transition: all 0.2s ease-in-out;
+}
+div.stButton > button:hover {
+    border-color: #e5a93d !important;
+    color: #e5a93d !important;
+    box-shadow: 0 0 10px rgba(229, 169, 61, 0.4);
+    transform: scale(1.03);
+}
+</style>
+""", unsafe_allow_html=True)
+
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
 
@@ -177,7 +214,8 @@ try:
                     titulo = obtener_titulo(props.get("Título", {}))
                     if titulo == "Sin título": continue
                     
-                    estado = obtener_estado(props.get("Estado", {}))
+                    estado_lower = obtener_estado(props.get("Estado", {})).strip()
+                    
                     info_libro = {
                         "titulo": titulo,
                         "autor_texto": obtener_texto_formula(props.get("Texto Autor", {})),
@@ -186,7 +224,7 @@ try:
                         "colores": obtener_multiselect(props.get("Color", {})),
                         "ritmos": obtener_multiselect(props.get("Ritmo", {})),
                         "tonos": obtener_multiselect(props.get("Tono", {})),
-                        "narradores": obtener_multiselect(props.get("Narrador", {})), # <-- AÑADIDO
+                        "narradores": obtener_multiselect(props.get("Narrador", {})),
                         "generos": obtener_ids(props.get("Género", {})),
                         "autores_ids": obtener_ids(props.get("Autor", {})),
                         "descripcion": obtener_descripcion(props.get("Descripción", {})),
@@ -198,14 +236,19 @@ try:
                     nombre_visual = f"{titulo}, de {info_libro['autor_texto']}" if info_libro['autor_texto'] else titulo
                     diccionario_libros[nombre_visual] = info_libro
                     
-                    if any(k in estado for k in ["leído", "terminado", "finished", "leídos"]):
+                    # --- FILTRADO EXACTO SEGÚN TUS ETIQUETAS ---
+                    if estado_lower == "leído":
                         leidos.append(nombre_visual)
                         for a_id in info_libro["autores_ids"]: autores_leidos_ids.add(a_id)
-                    elif "por terminar" in estado:
+                    elif estado_lower == "por terminar":
                         info_libro["es_por_terminar"] = True
                         por_terminar.append(info_libro)
-                    elif any(k in estado for k in ["leyendo", "en curso", "reading"]): pass 
-                    else: pendientes.append(info_libro)
+                    elif estado_lower == "leyendo":
+                        pass # Ignoramos los que estás leyendo ahora
+                    elif estado_lower == "por leer":
+                        pendientes.append(info_libro)
+                    else:
+                        pendientes.append(info_libro) # Por si hay alguno en blanco
                 
                 has_more = datos.get("has_more", False)
                 next_cursor = datos.get("next_cursor", None)
@@ -213,6 +256,14 @@ try:
 
     leidos.sort()
     candidatos = pendientes + por_terminar
+    
+    # === 📊 PANEL DE ESTADÍSTICAS ===
+    st.markdown("### 📊 Tu Biblioteca en Números")
+    met1, met2, met3 = st.columns(3)
+    met1.metric("📚 Libros Leídos", len(leidos))
+    met2.metric("📖 Pendientes", len(candidatos))
+    met3.metric("✍️ Autores Descubiertos", len(autores_leidos_ids))
+    st.markdown("<br>", unsafe_allow_html=True)
     
     st.subheader("🎯 Tu punto de partida")
     libro_elegido = st.selectbox("Elige el último libro que te encantó:", leidos)
@@ -241,11 +292,11 @@ try:
         tags_ref = []
         if ref.get("ritmos"): tags_ref.append(f"⏱️ {ref['ritmos'][0]}")
         if ref.get("tonos"): tags_ref.append(f"🎭 {ref['tonos'][0]}")
-        if ref.get("narradores"): tags_ref.append(f"🗣️ {ref['narradores'][0]}") # <-- AÑADIDO
+        if ref.get("narradores"): tags_ref.append(f"🗣️ {ref['narradores'][0]}")
         if tags_ref: st.caption(" | ".join(tags_ref))
             
         if ref.get("descripcion"):
-            with st.expander("📖 Leer sinopsis"):
+            with st.expander("📖 Leer sinopsis completa"):
                 st.write(ref["descripcion"])
             
     st.markdown("<br>", unsafe_allow_html=True)
@@ -396,7 +447,7 @@ try:
         with cx2:
             f_ritmo = st.checkbox("⏱️ Mismo ritmo")
             f_tono = st.checkbox("🎭 Mismo tono")
-            f_narrador = st.checkbox("🗣️ Mismo narrador") # <-- AÑADIDO
+            f_narrador = st.checkbox("🗣️ Mismo narrador")
         with cx3:
             f_color = st.checkbox("🎨 Mismo color")
             f_ingles = st.checkbox("🇬🇧 En inglés")
