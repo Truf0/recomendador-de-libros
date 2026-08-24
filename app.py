@@ -3,16 +3,17 @@ import requests
 import random
 import json
 import google.generativeai as genai
+import base64
+import os
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
 # === 🎨 MAGIA ESTÉTICA (Sutil y Limpia) ===
 st.markdown("""
 <style>
-/* 1. Importar tipografías de Google Fonts */
+/* Importar tipografías de Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Nunito:wght@400;700&display=swap');
 
-/* 2. Cambiar la letra de la web */
 html, body, [class*="css"] {
     font-family: 'Nunito', sans-serif;
 }
@@ -20,7 +21,6 @@ h1, h2, h3, h4, h5, h6 {
     font-family: 'Lora', serif !important;
 }
 
-/* 3. Efecto sutil de movimiento en los botones */
 div.stButton > button {
     transition: transform 0.2s ease-in-out;
 }
@@ -29,6 +29,44 @@ div.stButton > button:hover {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# --- BÚSQUEDA AUTOMÁTICA DE TU IMAGEN ---
+# Busca cualquier archivo que contenga la palabra "fondo", ignorando mayúsculas/extensiones
+def obtener_imagen_fondo():
+    for archivo in os.listdir():
+        if "fondo" in archivo.lower():
+            try:
+                with open(archivo, "rb") as img_file:
+                    b64 = base64.b64encode(img_file.read()).decode()
+                # Detectar si es PNG o JPG automáticamente
+                mime = "image/png" if archivo.lower().endswith(".png") else "image/jpeg"
+                return f"data:{mime};base64,{b64}"
+            except:
+                return None
+    return None
+
+# Carga tu foto, y si por algún motivo no la encuentra, pone una de repuesto para que no quede feo
+fondo_url = obtener_imagen_fondo() or "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=80"
+
+# --- EL BANNER ---
+st.markdown(f"""
+<div style="
+    background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.4)), url('{fondo_url}') center/cover;
+    border-radius: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+">
+    <h1 style="color: white !important; margin: 0; font-size: 3em; font-family: 'Lora', serif; text-shadow: 2px 2px 8px rgba(0,0,0,0.9), 0px 0px 20px rgba(0,0,0,0.7);">
+        📚 Mi Recomendador de Lectura
+    </h1>
+    <p style="color: #f8f9fa; font-size: 1.2em; margin-top: 10px; font-family: 'Nunito', sans-serif; text-shadow: 1px 1px 5px rgba(0,0,0,0.9);">
+        Encuentra tu próxima gran aventura literaria
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
 
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
@@ -171,39 +209,7 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
     if st.button("Cerrar", use_container_width=True):
         st.rerun()
 
-import base64
 
-# --- INICIO DE LA APP Y EL BANNER LOCAL ---
-
-# 1. Función para leer tu foto del ordenador
-def get_base64_image(image_path):
-    try:
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    except FileNotFoundError:
-        return "" # Si no encuentra la foto, se queda en blanco pero no rompe la app
-
-# 2. Leemos la imagen (¡Asegúrate de que se llama igual que tu archivo!)
-img_b64 = get_base64_image("Mi rincón de lectura.jpg")
-
-# 3. Pintamos el Banner
-st.markdown(f"""
-<div style="
-    background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3)), url('data:image/jpeg;base64,{img_b64}') center/cover;
-    border-radius: 12px;
-    padding: 60px 20px;
-    text-align: center;
-    margin-bottom: 30px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-">
-    <h1 style="color: white !important; margin: 0; font-size: 3em; font-family: 'Lora', serif; text-shadow: 2px 2px 8px rgba(0,0,0,0.9), 0px 0px 20px rgba(0,0,0,0.7);">
-        📚 Mi Recomendador de Lectura
-    </h1>
-    <p style="color: #f8f9fa; font-size: 1.2em; margin-top: 10px; font-family: 'Nunito', sans-serif; text-shadow: 1px 1px 5px rgba(0,0,0,0.9);">
-        Encuentra tu próxima gran aventura literaria
-    </p>
-</div>
-""", unsafe_allow_html=True)
 try:
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
     headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
