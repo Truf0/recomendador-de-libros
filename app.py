@@ -218,11 +218,15 @@ try:
     
     # === EL ESCAPARATE ===
     st.markdown("<br>", unsafe_allow_html=True)
-    esc_col1, esc_col2 = st.columns([1, 4])
+    esc_col1, esc_col2 = st.columns([1.2, 3])
     with esc_col1:
         if ref.get("portada_url"):
             st.markdown(
-                f'<img src="{ref["portada_url"]}" style="width: 100%; max-width: 200px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">', 
+                f'''
+                <div style="display: flex; justify-content: center;">
+                    <img src="{ref["portada_url"]}" style="width: 100%; max-width: 220px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                </div>
+                ''', 
                 unsafe_allow_html=True
             )
         else:
@@ -238,10 +242,8 @@ try:
         if tags_ref: st.caption(" | ".join(tags_ref))
             
         if ref.get("descripcion"):
-            desc = ref["descripcion"]
-            # Recortamos la sinopsis si es muy larga para que no coma toda la pantalla
-            if len(desc) > 350: desc = desc[:350] + "..."
-            st.write(desc)
+            with st.expander("📖 Leer sinopsis"):
+                st.write(ref["descripcion"])
             
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("---")
