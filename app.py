@@ -182,7 +182,7 @@ try:
                         "generos": obtener_ids(props.get("Género", {})),
                         "autores_ids": obtener_ids(props.get("Autor", {})),
                         "descripcion": obtener_descripcion(props.get("Descripción", {})),
-                        "portada_url": obtener_portada(props.get("Portada", {})), # NUEVO
+                        "portada_url": obtener_portada(props.get("Portada", {})),
                         "es_por_terminar": False,
                         "es_ingles": obtener_checkbox(props.get("Inglés", {}))
                     }
@@ -331,7 +331,7 @@ try:
                 if opciones: mostrar_popup(random.choice(opciones), f"Con la misma vibra ({', '.join(t_ref)}):")
                 else: st.warning("No hay pendientes con este tono.")
 
-    # --- ORÁCULO DE GEMINI (Sin Pop-up) ---
+    # --- ORÁCULO DE GEMINI (Mood Reader) ---
     st.markdown("---")
     st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
     mood_texto = st.text_input("📝 Escribe aquí tu antojo:")
@@ -355,7 +355,10 @@ try:
                         
                         if 0 <= int(res_json["indice"]) < len(cands_validos):
                             ganador = cands_validos[int(res_json["indice"])]
-                            st.success(f"🔮 **El Oráculo ha hablado:**\n\n{formato_mensaje(ganador)}\n\n✨ *Veredicto:* {res_json['explicacion']}")
+                            
+                            # LLAMADA AL POP-UP PARA EL ORÁCULO
+                            mostrar_popup(ganador, "🔮 El Oráculo ha hablado", res_json["explicacion"])
+                            
                         else: st.error("Índice inválido.")
                     except Exception as e: st.error(f"Error Gemini: {e}")
 
