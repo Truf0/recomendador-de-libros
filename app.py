@@ -173,25 +173,23 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
 
 # --- INICIO DE LA APP Y EL BANNER ---
 
-# Banner con imagen de fondo (Unsplash) y título integrado
 st.markdown("""
 <div style="
-    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.8)), url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1200&q=80') center/cover;
+    background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3)), url('https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=80') center/cover;
     border-radius: 12px;
     padding: 60px 20px;
     text-align: center;
     margin-bottom: 30px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 ">
-    <h1 style="color: white !important; margin: 0; font-size: 3em; font-family: 'Lora', serif; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+    <h1 style="color: white !important; margin: 0; font-size: 3em; font-family: 'Lora', serif; text-shadow: 2px 2px 8px rgba(0,0,0,0.9), 0px 0px 20px rgba(0,0,0,0.7);">
         📚 Mi Recomendador de Lectura
     </h1>
-    <p style="color: #e0e0e0; font-size: 1.2em; margin-top: 10px; font-family: 'Nunito', sans-serif;">
+    <p style="color: #f8f9fa; font-size: 1.2em; margin-top: 10px; font-family: 'Nunito', sans-serif; text-shadow: 1px 1px 5px rgba(0,0,0,0.9);">
         Encuentra tu próxima gran aventura literaria
     </p>
 </div>
 """, unsafe_allow_html=True)
-
 
 try:
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
