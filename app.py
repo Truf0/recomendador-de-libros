@@ -112,9 +112,23 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
     with col1:
         url_img = libro.get("portada_url")
         if url_img:
-            # Truco infalible: HTML nativo para evitar cuelgues en Streamlit Cloud con AWS S3
+            # Animación CSS para que la carga de la imagen se vea suave y elegante
             st.markdown(
-                f'<img src="{url_img}" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">', 
+                f'''
+                <style>
+                @keyframes fadeIn {{
+                    from {{ opacity: 0; transform: translateY(10px); }}
+                    to {{ opacity: 1; transform: translateY(0); }}
+                }}
+                .portada-animada {{
+                    width: 100%;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                    animation: fadeIn 0.6s ease-out forwards;
+                }}
+                </style>
+                <img src="{url_img}" class="portada-animada">
+                ''', 
                 unsafe_allow_html=True
             )
         else:
@@ -125,9 +139,8 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
         if mensaje_extra:
             st.info(f"✨ {mensaje_extra}")
             
-        # Pequeñas píldoras estéticas
+        # Píldoras estéticas (Solo Ritmo y Tono)
         tags = []
-        if libro.get("colores"): tags.append(f"🎨 {libro['colores'][0]}")
         if libro.get("ritmos"): tags.append(f"⏱️ {libro['ritmos'][0]}")
         if libro.get("tonos"): tags.append(f"🎭 {libro['tonos'][0]}")
         if tags:
