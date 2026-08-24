@@ -171,11 +171,25 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
     if st.button("Cerrar", use_container_width=True):
         st.rerun()
 
-# --- INICIO DE LA APP Y EL BANNER ---
+import base64
 
-st.markdown("""
+# --- INICIO DE LA APP Y EL BANNER LOCAL ---
+
+# 1. Función para leer tu foto del ordenador
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except FileNotFoundError:
+        return "" # Si no encuentra la foto, se queda en blanco pero no rompe la app
+
+# 2. Leemos la imagen (¡Asegúrate de que se llama igual que tu archivo!)
+img_b64 = get_base64_image("Mi rincón de lectura.jpg")
+
+# 3. Pintamos el Banner
+st.markdown(f"""
 <div style="
-    background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3)), url('https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=80') center/cover;
+    background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3)), url('data:image/jpeg;base64,{img_b64}') center/cover;
     border-radius: 12px;
     padding: 60px 20px;
     text-align: center;
@@ -190,7 +204,6 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
-
 try:
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
     headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
