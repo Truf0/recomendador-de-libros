@@ -213,8 +213,37 @@ try:
     candidatos = pendientes + por_terminar
     
     st.subheader("🎯 Tu punto de partida")
-    libro_elegido = st.selectbox("Último título leído", leidos)
+    libro_elegido = st.selectbox("Elige el último libro que te encantó:", leidos)
     ref = diccionario_libros[libro_elegido]
+    
+    # === EL ESCAPARATE ===
+    st.markdown("<br>", unsafe_allow_html=True)
+    esc_col1, esc_col2 = st.columns([1, 4])
+    with esc_col1:
+        if ref.get("portada_url"):
+            st.markdown(
+                f'<img src="{ref["portada_url"]}" style="width: 100%; max-width: 200px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">', 
+                unsafe_allow_html=True
+            )
+        else:
+            st.info("🖼️ Sin portada")
+            
+    with esc_col2:
+        st.markdown(f"## {ref['titulo']}")
+        st.markdown(f"**✍️ {ref['autor_texto']}**")
+        
+        tags_ref = []
+        if ref.get("ritmos"): tags_ref.append(f"⏱️ {ref['ritmos'][0]}")
+        if ref.get("tonos"): tags_ref.append(f"🎭 {ref['tonos'][0]}")
+        if tags_ref: st.caption(" | ".join(tags_ref))
+            
+        if ref.get("descripcion"):
+            desc = ref["descripcion"]
+            # Recortamos la sinopsis si es muy larga para que no coma toda la pantalla
+            if len(desc) > 350: desc = desc[:350] + "..."
+            st.write(desc)
+            
+    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("---")
     
     # === LA MAGIA DE LAS PESTAÑAS ===
