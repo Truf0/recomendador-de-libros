@@ -6,7 +6,7 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
-# === 🎨 MAGIA ESTÉTICA (CSS) ===
+# === 🎨 MAGIA ESTÉTICA (Sutil y Limpia) ===
 st.markdown("""
 <style>
 /* 1. Importar tipografías de Google Fonts */
@@ -18,27 +18,14 @@ html, body, [class*="css"] {
 }
 h1, h2, h3, h4, h5, h6 {
     font-family: 'Lora', serif !important;
-    color: #e5a93d !important; /* Tono dorado elegante para títulos */
 }
 
-/* 3. Estilo Premium para las tarjetas de Estadísticas */
-div[data-testid="metric-container"] {
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-}
-
-/* 4. Efecto de brillo en los botones al pasar el ratón */
+/* 3. Efecto sutil de movimiento en los botones */
 div.stButton > button {
-    transition: all 0.2s ease-in-out;
+    transition: transform 0.2s ease-in-out;
 }
 div.stButton > button:hover {
-    border-color: #e5a93d !important;
-    color: #e5a93d !important;
-    box-shadow: 0 0 10px rgba(229, 169, 61, 0.4);
-    transform: scale(1.03);
+    transform: scale(1.02);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -236,7 +223,6 @@ try:
                     nombre_visual = f"{titulo}, de {info_libro['autor_texto']}" if info_libro['autor_texto'] else titulo
                     diccionario_libros[nombre_visual] = info_libro
                     
-                    # --- FILTRADO EXACTO SEGÚN TUS ETIQUETAS ---
                     if estado_lower == "leído":
                         leidos.append(nombre_visual)
                         for a_id in info_libro["autores_ids"]: autores_leidos_ids.add(a_id)
@@ -244,11 +230,11 @@ try:
                         info_libro["es_por_terminar"] = True
                         por_terminar.append(info_libro)
                     elif estado_lower == "leyendo":
-                        pass # Ignoramos los que estás leyendo ahora
+                        pass 
                     elif estado_lower == "por leer":
                         pendientes.append(info_libro)
                     else:
-                        pendientes.append(info_libro) # Por si hay alguno en blanco
+                        pendientes.append(info_libro) 
                 
                 has_more = datos.get("has_more", False)
                 next_cursor = datos.get("next_cursor", None)
@@ -256,14 +242,6 @@ try:
 
     leidos.sort()
     candidatos = pendientes + por_terminar
-    
-    # === 📊 PANEL DE ESTADÍSTICAS ===
-    st.markdown("### 📊 Tu Biblioteca en Números")
-    met1, met2, met3 = st.columns(3)
-    met1.metric("📚 Libros Leídos", len(leidos))
-    met2.metric("📖 Pendientes", len(candidatos))
-    met3.metric("✍️ Autores Descubiertos", len(autores_leidos_ids))
-    st.markdown("<br>", unsafe_allow_html=True)
     
     st.subheader("🎯 Tu punto de partida")
     libro_elegido = st.selectbox("Elige el último libro que te encantó:", leidos)
@@ -305,9 +283,6 @@ try:
     # === LA MAGIA DE LAS PESTAÑAS ===
     tab1, tab2, tab3 = st.tabs(["⚡ Búsqueda Rápida", "🍹 La Coctelera", "🔮 El Oráculo"])
     
-    # ----------------------------------------------------
-    # PESTAÑA 1: BÚSQUEDA RÁPIDA (Un clic)
-    # ----------------------------------------------------
     with tab1:
         st.markdown("#### 🎲 Opciones Rápidas")
         col1, col2, col3, col4 = st.columns(4)
@@ -432,9 +407,6 @@ try:
                     if opciones: mostrar_popup(random.choice(opciones), f"A través de sus ojos ({', '.join(n_ref)}):")
                     else: st.warning("No hay pendientes con este narrador.")
 
-    # ----------------------------------------------------
-    # PESTAÑA 2: LA COCTELERA (Multifiltro)
-    # ----------------------------------------------------
     with tab2:
         st.markdown("### 🍹 La Coctelera Literaria")
         st.write("Mezcla todas las condiciones que debe cumplir tu próxima lectura basándose en el libro que tienes seleccionado arriba:")
@@ -484,9 +456,6 @@ try:
             else:
                 st.error("❌ Vaya, ningún libro pendiente cumple TODAS esas condiciones a la vez. ¡Quita algún ingrediente!")
 
-    # ----------------------------------------------------
-    # PESTAÑA 3: EL ORÁCULO
-    # ----------------------------------------------------
     with tab3:
         st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
         st.write("Olvídate de filtros. Cuéntale a la Inteligencia Artificial cómo te sientes o qué te apetece y ella buscará el libro perfecto.")
