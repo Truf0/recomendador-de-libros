@@ -106,13 +106,11 @@ def formato_mensaje(rec):
 @st.dialog("🎉 ¡Aquí tienes tu próxima lectura!")
 def mostrar_popup(libro, titular, mensaje_extra=""):
     st.markdown(f"### {titular}")
-    
     col1, col2 = st.columns([1, 1.5])
     
     with col1:
         url_img = libro.get("portada_url")
         if url_img:
-            # Animación CSS para que la carga de la imagen se vea suave y elegante
             st.markdown(
                 f'''
                 <style>
@@ -128,23 +126,18 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
                 }}
                 </style>
                 <img src="{url_img}" class="portada-animada">
-                ''', 
-                unsafe_allow_html=True
-            )
+                ''', unsafe_allow_html=True)
         else:
-            st.info("🖼️ Sin portada en Notion")
+            st.info("🖼️ Sin portada")
             
     with col2:
         st.markdown(formato_mensaje(libro))
-        if mensaje_extra:
-            st.info(f"✨ {mensaje_extra}")
+        if mensaje_extra: st.info(f"✨ {mensaje_extra}")
             
-        # Píldoras estéticas (Solo Ritmo y Tono)
         tags = []
         if libro.get("ritmos"): tags.append(f"⏱️ {libro['ritmos'][0]}")
         if libro.get("tonos"): tags.append(f"🎭 {libro['tonos'][0]}")
-        if tags:
-            st.caption(" | ".join(tags))
+        if tags: st.caption(" | ".join(tags))
             
         if libro.get("descripcion"):
             with st.expander("📖 Leer sinopsis"):
@@ -222,158 +215,206 @@ try:
     st.subheader("🎯 Tu punto de partida")
     libro_elegido = st.selectbox("Último título leído", leidos)
     ref = diccionario_libros[libro_elegido]
-    
     st.markdown("---")
-    st.markdown("#### 🎲 Opciones Rápidas")
-    col1, col2, col3, col4 = st.columns(4)
     
-    with col1:
-        if st.button("🔮 Mismo género", use_container_width=True):
-            g_ref, a_ref = set(ref["generos"]), set(ref["autores_ids"])
-            if not g_ref: st.warning("Sin géneros asignados.")
-            else:
-                cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
-                exactas = [p for p in cands if set(p["generos"]) == g_ref]
-                expandidas = [p for p in cands if g_ref.issubset(set(p["generos"])) and set(p["generos"]) != g_ref]
-                concentradas = [p for p in cands if set(p["generos"]).issubset(g_ref) and len(set(p["generos"])) > 0 and set(p["generos"]) != g_ref]
-                
-                if exactas: mostrar_popup(random.choice(exactas), "🔥 Match Exacto (100% pureza)")
-                elif expandidas: mostrar_popup(random.choice(expandidas), "✨ Match Expandido (Tus géneros + extra)")
-                elif concentradas: mostrar_popup(random.choice(concentradas), "🎯 Match Concentrado (Esencia pura)")
-                else: st.warning("No hay libros pendientes que igualen esta pureza.")
-
-    with col2:
-        if st.button("✍️ Mismo autor", use_container_width=True):
-            opciones = [p for p in candidatos if set(p["autores_ids"]).intersection(set(ref["autores_ids"]))]
-            if opciones: mostrar_popup(random.choice(opciones), "Siguiendo con su pluma:")
-            else: st.warning("No te quedan libros pendientes de este autor.")
-
-    with col3:
-        if st.button("🔄 Cambio radical", use_container_width=True):
-            opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
-            if opciones: mostrar_popup(random.choice(opciones), "Rompe con todo:")
-            else: st.warning("¡Añade más variedad a tus pendientes!")
-            
-    with col4:
-        if st.button("🇬🇧 En Inglés", use_container_width=True):
-            opciones = [p for p in candidatos if p.get("es_ingles", False)]
-            if opciones: mostrar_popup(random.choice(opciones), "Para tu reto de lectura:")
-            else: st.warning("No tienes pendientes marcados en inglés.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔍 Opciones Avanzadas")
-    col5, col6, col7, col8 = st.columns(4)
+    # === LA MAGIA DE LAS PESTAÑAS ===
+    tab1, tab2, tab3 = st.tabs(["⚡ Búsqueda Rápida", "🍹 La Coctelera", "🔮 El Oráculo"])
     
-    with col5:
-        if st.button("🔗 Continuar Saga", use_container_width=True):
-            if not ref.get("saga_texto"): st.warning("No pertenece a ninguna saga.")
-            else:
-                opciones = [p for p in candidatos if p.get("saga_texto") == ref.get("saga_texto") and p.get("numero_saga") is not None]
-                if opciones:
-                    siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
-                    mostrar_popup(siguiente, "El viaje continúa:")
-                else: st.warning("¡Felicidades! Estás al día con esta saga.")
-                    
-    with col6:
-        if st.button("📚 Saga Similar", use_container_width=True):
-            cands_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(set(ref["generos"]).intersection(set(p["generos"]))) >= 1]
-            opciones = primeras_de_saga(cands_saga)
-            if opciones: mostrar_popup(random.choice(opciones), "Empieza una nueva aventura:")
-            else: st.warning("No hay nuevas sagas de este género listas para empezar.")
-
-    with col7:
-        if st.button("🎨 Buscar por Color", use_container_width=True):
-            opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(set(ref.get("colores", [])))]
-            if opciones: mostrar_popup(random.choice(opciones), "Estética compartida:")
-            else: st.warning("No hay libros pendientes con esta paleta de colores.")
-
-    with col8:
-        if st.button("🌫️ Misma Atmósfera (Gemini ✨)", use_container_width=True):
-            if not ref.get("descripcion") or len(ref.get("descripcion")) < 20: st.warning("Sin descripción suficiente.")
-            else:
-                cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20 and not set(p["autores_ids"]).intersection(set(ref["autores_ids"]))]
-                if not cands_validos: cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
-                
-                if not cands_validos: st.warning("No tienes pendientes con descripción para analizar.")
+    # ----------------------------------------------------
+    # PESTAÑA 1: BÚSQUEDA RÁPIDA (Un clic)
+    # ----------------------------------------------------
+    with tab1:
+        st.markdown("#### 🎲 Opciones Rápidas")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            if st.button("🔮 Mismo género", use_container_width=True):
+                g_ref, a_ref = set(ref["generos"]), set(ref["autores_ids"])
+                if not g_ref: st.warning("Sin géneros asignados.")
                 else:
-                    with st.spinner("🧠 Gemini está analizando..."):
+                    cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
+                    exactas = [p for p in cands if set(p["generos"]) == g_ref]
+                    expandidas = [p for p in cands if g_ref.issubset(set(p["generos"])) and set(p["generos"]) != g_ref]
+                    concentradas = [p for p in cands if set(p["generos"]).issubset(g_ref) and len(set(p["generos"])) > 0 and set(p["generos"]) != g_ref]
+                    
+                    if exactas: mostrar_popup(random.choice(exactas), "🔥 Match Exacto (100% pureza)")
+                    elif expandidas: mostrar_popup(random.choice(expandidas), "✨ Match Expandido")
+                    elif concentradas: mostrar_popup(random.choice(concentradas), "🎯 Match Concentrado")
+                    else: st.warning("No hay libros pendientes que igualen esta pureza.")
+
+        with col2:
+            if st.button("✍️ Mismo autor", use_container_width=True):
+                opciones = [p for p in candidatos if set(p["autores_ids"]).intersection(set(ref["autores_ids"]))]
+                if opciones: mostrar_popup(random.choice(opciones), "Siguiendo con su pluma:")
+                else: st.warning("No te quedan libros pendientes de este autor.")
+
+        with col3:
+            if st.button("🔄 Cambio radical", use_container_width=True):
+                opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
+                if opciones: mostrar_popup(random.choice(opciones), "Rompe con todo:")
+                else: st.warning("¡Añade más variedad a tus pendientes!")
+                
+        with col4:
+            if st.button("🇬🇧 En Inglés", use_container_width=True):
+                opciones = [p for p in candidatos if p.get("es_ingles", False)]
+                if opciones: mostrar_popup(random.choice(opciones), "Para tu reto de lectura:")
+                else: st.warning("No tienes pendientes marcados en inglés.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 🔍 Opciones Avanzadas")
+        col5, col6, col7, col8 = st.columns(4)
+        
+        with col5:
+            if st.button("🔗 Continuar Saga", use_container_width=True):
+                if not ref.get("saga_texto"): st.warning("No pertenece a ninguna saga.")
+                else:
+                    opciones = [p for p in candidatos if p.get("saga_texto") == ref.get("saga_texto") and p.get("numero_saga") is not None]
+                    if opciones:
+                        siguiente = min(opciones, key=lambda x: safe_float(x["numero_saga"]))
+                        mostrar_popup(siguiente, "El viaje continúa:")
+                    else: st.warning("¡Felicidades! Estás al día.")
+                        
+        with col6:
+            if st.button("📚 Saga Similar", use_container_width=True):
+                cands_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(set(ref["generos"]).intersection(set(p["generos"]))) >= 1]
+                opciones = primeras_de_saga(cands_saga)
+                if opciones: mostrar_popup(random.choice(opciones), "Empieza una nueva aventura:")
+                else: st.warning("No hay nuevas sagas de este género listas para empezar.")
+
+        with col7:
+            if st.button("🎨 Buscar por Color", use_container_width=True):
+                opciones = [p for p in candidatos if set(p.get("colores", [])).intersection(set(ref.get("colores", [])))]
+                if opciones: mostrar_popup(random.choice(opciones), "Estética compartida:")
+                else: st.warning("No hay libros pendientes con esta paleta de colores.")
+
+        with col8:
+            if st.button("🌫️ Misma Atmósfera (Gemini)", use_container_width=True):
+                if not ref.get("descripcion") or len(ref.get("descripcion")) < 20: st.warning("Sin descripción suficiente.")
+                else:
+                    cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20 and not set(p["autores_ids"]).intersection(set(ref["autores_ids"]))]
+                    if not cands_validos: cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
+                    if not cands_validos: st.warning("No tienes pendientes con descripción para analizar.")
+                    else:
+                        with st.spinner("🧠 Gemini está analizando..."):
+                            try:
+                                genai.configure(api_key=st.secrets["gemini_api_key"])
+                                model = genai.GenerativeModel('gemini-3.5-flash-lite')
+                                prompt = f"LIBRO: {ref['titulo']}\nSINOPSIS: {ref['descripcion']}\nCANDIDATOS:\n"
+                                for i, c in enumerate(cands_validos): prompt += f"[{i}] {c['titulo']}\nSinopsis: {c['descripcion']}\n"
+                                prompt += 'Devuelve JSON: {"indice": int, "explicacion": "texto"}'
+                                res = model.generate_content(prompt, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+                                res_json = json.loads(res.text)
+                                if 0 <= int(res_json["indice"]) < len(cands_validos):
+                                    mostrar_popup(cands_validos[int(res_json["indice"])], "🧠 Recomendación de Gemini", res_json["explicacion"])
+                                else: st.error("Índice inválido.")
+                            except Exception as e: st.error(f"Error Gemini: {e}")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 💥 Emociones y Sensaciones")
+        col9, col10, col11, col12 = st.columns(4)
+        with col9:
+            if st.button("🩸 Sangre Nueva", use_container_width=True):
+                opciones = [p for p in candidatos if not any(a_id in autores_leidos_ids for a_id in p["autores_ids"])]
+                if opciones: mostrar_popup(random.choice(opciones), "Explora nuevos horizontes:")
+                else: st.warning("¡Ya has leído a todos tus autores pendientes!")
+        with col10:
+            if st.button("🎲 Ruleta Rusa", use_container_width=True):
+                if candidatos: mostrar_popup(random.choice(candidatos), "La suerte está echada:")
+                else: st.warning("No te quedan libros pendientes.")
+        with col11:
+            if st.button("⏱️ Mismo Ritmo", use_container_width=True):
+                r_ref = set(ref.get("ritmos", []))
+                if not r_ref: st.warning("Este libro no tiene Ritmo.")
+                else:
+                    opciones = [p for p in candidatos if set(p.get("ritmos", [])).intersection(r_ref)]
+                    if opciones: mostrar_popup(random.choice(opciones), f"Al mismo compás ({', '.join(r_ref)}):")
+                    else: st.warning("No hay pendientes con este ritmo.")
+        with col12:
+            if st.button("🎭 Mismo Tono", use_container_width=True):
+                t_ref = set(ref.get("tonos", []))
+                if not t_ref: st.warning("Este libro no tiene Tono.")
+                else:
+                    opciones = [p for p in candidatos if set(p.get("tonos", [])).intersection(t_ref)]
+                    if opciones: mostrar_popup(random.choice(opciones), f"Con la misma vibra ({', '.join(t_ref)}):")
+                    else: st.warning("No hay pendientes con este tono.")
+
+    # ----------------------------------------------------
+    # PESTAÑA 2: LA COCTELERA (Multifiltro)
+    # ----------------------------------------------------
+    with tab2:
+        st.markdown("### 🍹 La Coctelera Literaria")
+        st.write("Mezcla todas las condiciones que debe cumplir tu próxima lectura basándose en el libro que tienes seleccionado arriba:")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        cx1, cx2, cx3 = st.columns(3)
+        with cx1:
+            f_genero = st.checkbox("🔮 Mismo género")
+            f_autor = st.checkbox("✍️ Mismo autor")
+        with cx2:
+            f_ritmo = st.checkbox("⏱️ Mismo ritmo")
+            f_tono = st.checkbox("🎭 Mismo tono")
+        with cx3:
+            f_color = st.checkbox("🎨 Mismo color")
+            f_ingles = st.checkbox("🇬🇧 En inglés")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("🍸 Agitar Coctelera", type="primary"):
+            filtrados = candidatos.copy()
+            
+            if f_genero:
+                g_ref = set(ref["generos"])
+                filtrados = [p for p in filtrados if g_ref.intersection(set(p["generos"]))]
+            if f_autor:
+                a_ref = set(ref["autores_ids"])
+                filtrados = [p for p in filtrados if a_ref.intersection(set(p["autores_ids"]))]
+            if f_ritmo:
+                r_ref = set(ref.get("ritmos", []))
+                filtrados = [p for p in filtrados if r_ref.intersection(set(p.get("ritmos", [])))]
+            if f_tono:
+                t_ref = set(ref.get("tonos", []))
+                filtrados = [p for p in filtrados if t_ref.intersection(set(p.get("tonos", [])))]
+            if f_color:
+                c_ref = set(ref.get("colores", []))
+                filtrados = [p for p in filtrados if c_ref.intersection(set(p.get("colores", [])))]
+            if f_ingles:
+                filtrados = [p for p in filtrados if p.get("es_ingles", False)]
+                
+            if len(filtrados) > 0:
+                ganador = random.choice(filtrados)
+                mostrar_popup(ganador, "🍹 ¡Aquí tienes tu cóctel!", "Esta mezcla es exactamente lo que pediste.")
+            else:
+                st.error("❌ Vaya, ningún libro pendiente cumple TODAS esas condiciones a la vez. ¡Quita algún ingrediente!")
+
+    # ----------------------------------------------------
+    # PESTAÑA 3: EL ORÁCULO
+    # ----------------------------------------------------
+    with tab3:
+        st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
+        st.write("Olvídate de filtros. Cuéntale a la Inteligencia Artificial cómo te sientes o qué te apetece y ella buscará el libro perfecto.")
+        mood_texto = st.text_input("📝 Escribe aquí tu antojo:")
+        
+        if st.button("✨ Preguntar al Oráculo", type="primary"):
+            if not mood_texto: st.warning("¡Escribe algo en la caja!")
+            else:
+                cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
+                if not cands_validos: st.warning("No hay pendientes con descripción.")
+                else:
+                    with st.spinner("🔮 El Oráculo está consultando los astros..."):
                         try:
                             genai.configure(api_key=st.secrets["gemini_api_key"])
                             model = genai.GenerativeModel('gemini-3.5-flash-lite')
-                            prompt = f"LIBRO: {ref['titulo']}\nSINOPSIS: {ref['descripcion']}\nCANDIDATOS:\n"
+                            prompt = f'Deseo: "{mood_texto}"\nCANDIDATOS:\n'
                             for i, c in enumerate(cands_validos): prompt += f"[{i}] {c['titulo']}\nSinopsis: {c['descripcion']}\n"
-                            prompt += 'Devuelve JSON: {"indice": int, "explicacion": "texto"}'
+                            prompt += 'JSON: {"indice": int, "explicacion": "texto"}'
                             
                             res = model.generate_content(prompt, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
                             res_json = json.loads(res.text)
+                            
                             if 0 <= int(res_json["indice"]) < len(cands_validos):
-                                mostrar_popup(cands_validos[int(res_json["indice"])], "🧠 Recomendación de Gemini", res_json["explicacion"])
+                                ganador = cands_validos[int(res_json["indice"])]
+                                mostrar_popup(ganador, "🔮 El Oráculo ha hablado", res_json["explicacion"])
                             else: st.error("Índice inválido.")
                         except Exception as e: st.error(f"Error Gemini: {e}")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 💥 Nuevas Emociones y Sensaciones")
-    col9, col10, col11, col12 = st.columns(4)
-    
-    with col9:
-        if st.button("🩸 Sangre Nueva", use_container_width=True):
-            opciones = [p for p in candidatos if not any(a_id in autores_leidos_ids for a_id in p["autores_ids"])]
-            if opciones: mostrar_popup(random.choice(opciones), "Explora nuevos horizontes:")
-            else: st.warning("¡Ya has leído a todos tus autores pendientes!")
-                
-    with col10:
-        if st.button("🎲 Ruleta Rusa", use_container_width=True):
-            if candidatos: mostrar_popup(random.choice(candidatos), "La suerte está echada:")
-            else: st.warning("No te quedan libros pendientes.")
-
-    with col11:
-        if st.button("⏱️ Mismo Ritmo", use_container_width=True):
-            r_ref = set(ref.get("ritmos", []))
-            if not r_ref: st.warning("Este libro no tiene un Ritmo asignado.")
-            else:
-                opciones = [p for p in candidatos if set(p.get("ritmos", [])).intersection(r_ref)]
-                if opciones: mostrar_popup(random.choice(opciones), f"Al mismo compás ({', '.join(r_ref)}):")
-                else: st.warning("No hay pendientes con este ritmo.")
-
-    with col12:
-        if st.button("🎭 Mismo Tono", use_container_width=True):
-            t_ref = set(ref.get("tonos", []))
-            if not t_ref: st.warning("Este libro no tiene un Tono asignado.")
-            else:
-                opciones = [p for p in candidatos if set(p.get("tonos", [])).intersection(t_ref)]
-                if opciones: mostrar_popup(random.choice(opciones), f"Con la misma vibra ({', '.join(t_ref)}):")
-                else: st.warning("No hay pendientes con este tono.")
-
-    # --- ORÁCULO DE GEMINI (Mood Reader) ---
-    st.markdown("---")
-    st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
-    mood_texto = st.text_input("📝 Escribe aquí tu antojo:")
-    
-    if st.button("✨ Preguntar al Oráculo", type="primary"):
-        if not mood_texto: st.warning("¡Escribe algo en la caja!")
-        else:
-            cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
-            if not cands_validos: st.warning("No hay pendientes con descripción.")
-            else:
-                with st.spinner("🔮 El Oráculo está consultando..."):
-                    try:
-                        genai.configure(api_key=st.secrets["gemini_api_key"])
-                        model = genai.GenerativeModel('gemini-3.5-flash-lite')
-                        prompt = f'Deseo: "{mood_texto}"\nCANDIDATOS:\n'
-                        for i, c in enumerate(cands_validos): prompt += f"[{i}] {c['titulo']}\nSinopsis: {c['descripcion']}\n"
-                        prompt += 'JSON: {"indice": int, "explicacion": "texto"}'
-                        
-                        res = model.generate_content(prompt, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
-                        res_json = json.loads(res.text)
-                        
-                        if 0 <= int(res_json["indice"]) < len(cands_validos):
-                            ganador = cands_validos[int(res_json["indice"])]
-                            
-                            # LLAMADA AL POP-UP PARA EL ORÁCULO
-                            mostrar_popup(ganador, "🔮 El Oráculo ha hablado", res_json["explicacion"])
-                            
-                        else: st.error("Índice inválido.")
-                    except Exception as e: st.error(f"Error Gemini: {e}")
 
 except Exception as e:
     st.error(f"❌ Ups, error al cargar: {e}")
