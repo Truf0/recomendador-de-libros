@@ -137,6 +137,7 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
         tags = []
         if libro.get("ritmos"): tags.append(f"⏱️ {libro['ritmos'][0]}")
         if libro.get("tonos"): tags.append(f"🎭 {libro['tonos'][0]}")
+        if libro.get("narradores"): tags.append(f"🗣️ {libro['narradores'][0]}")
         if tags: st.caption(" | ".join(tags))
             
         if libro.get("descripcion"):
@@ -185,6 +186,7 @@ try:
                         "colores": obtener_multiselect(props.get("Color", {})),
                         "ritmos": obtener_multiselect(props.get("Ritmo", {})),
                         "tonos": obtener_multiselect(props.get("Tono", {})),
+                        "narradores": obtener_multiselect(props.get("Narrador", {})), # <-- AÑADIDO
                         "generos": obtener_ids(props.get("Género", {})),
                         "autores_ids": obtener_ids(props.get("Autor", {})),
                         "descripcion": obtener_descripcion(props.get("Descripción", {})),
@@ -239,6 +241,7 @@ try:
         tags_ref = []
         if ref.get("ritmos"): tags_ref.append(f"⏱️ {ref['ritmos'][0]}")
         if ref.get("tonos"): tags_ref.append(f"🎭 {ref['tonos'][0]}")
+        if ref.get("narradores"): tags_ref.append(f"🗣️ {ref['narradores'][0]}") # <-- AÑADIDO
         if tags_ref: st.caption(" | ".join(tags_ref))
             
         if ref.get("descripcion"):
@@ -368,6 +371,17 @@ try:
                     if opciones: mostrar_popup(random.choice(opciones), f"Con la misma vibra ({', '.join(t_ref)}):")
                     else: st.warning("No hay pendientes con este tono.")
 
+        st.markdown("<br>", unsafe_allow_html=True)
+        col13, col14, col15, col16 = st.columns(4)
+        with col13:
+            if st.button("🗣️ Mismo Narrador", use_container_width=True):
+                n_ref = set(ref.get("narradores", []))
+                if not n_ref: st.warning("Este libro no tiene Narrador asignado.")
+                else:
+                    opciones = [p for p in candidatos if set(p.get("narradores", [])).intersection(n_ref)]
+                    if opciones: mostrar_popup(random.choice(opciones), f"A través de sus ojos ({', '.join(n_ref)}):")
+                    else: st.warning("No hay pendientes con este narrador.")
+
     # ----------------------------------------------------
     # PESTAÑA 2: LA COCTELERA (Multifiltro)
     # ----------------------------------------------------
@@ -383,6 +397,7 @@ try:
         with cx2:
             f_ritmo = st.checkbox("⏱️ Mismo ritmo")
             f_tono = st.checkbox("🎭 Mismo tono")
+            f_narrador = st.checkbox("🗣️ Mismo narrador") # <-- AÑADIDO
         with cx3:
             f_color = st.checkbox("🎨 Mismo color")
             f_ingles = st.checkbox("🇬🇧 En inglés")
@@ -404,6 +419,9 @@ try:
             if f_tono:
                 t_ref = set(ref.get("tonos", []))
                 filtrados = [p for p in filtrados if t_ref.intersection(set(p.get("tonos", [])))]
+            if f_narrador:
+                n_ref = set(ref.get("narradores", []))
+                filtrados = [p for p in filtrados if n_ref.intersection(set(p.get("narradores", [])))]
             if f_color:
                 c_ref = set(ref.get("colores", []))
                 filtrados = [p for p in filtrados if c_ref.intersection(set(p.get("colores", [])))]
