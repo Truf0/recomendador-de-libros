@@ -8,10 +8,9 @@ import os
 
 st.set_page_config(page_title="Mi Recomendador", page_icon="📚", layout="wide")
 
-# === 🎨 MAGIA ESTÉTICA (Sutil y Limpia) ===
+# === 🎨 MAGIA ESTÉTICA ===
 st.markdown("""
 <style>
-/* Importar tipografías de Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Nunito:wght@400;700&display=swap');
 
 html, body, [class*="css"] {
@@ -63,7 +62,6 @@ st.markdown(f"""
     </p>
 </div>
 """, unsafe_allow_html=True)
-
 
 NOTION_TOKEN = st.secrets["notion_token"]
 DATABASE_ID = st.secrets["database_id"]
@@ -193,12 +191,11 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
         st.markdown(formato_mensaje(libro))
         if mensaje_extra: st.info(f"✨ {mensaje_extra}")
             
+        # ESTE ES EL ORDEN EXACTO QUE ME HAS PEDIDO: RITMO -> TONO -> NARRADOR -> INGLÉS
         tags = []
         if libro.get("ritmos"): tags.append(f"⏱️ {libro['ritmos'][0]}")
         if libro.get("tonos"): tags.append(f"🎭 {libro['tonos'][0]}")
         if libro.get("narradores"): tags.append(f"🗣️ {libro['narradores'][0]}")
-        
-        # AQUI AÑADIMOS LA BANDERA SI ES INGLÉS
         if libro.get("es_ingles"): tags.append("🇬🇧 Inglés")
             
         if tags: st.caption(" | ".join(tags))
@@ -210,7 +207,7 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
     if st.button("Cerrar", use_container_width=True):
         st.rerun()
 
-
+# --- COMIENZO LÓGICA PRINCIPAL ---
 try:
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
     headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
@@ -308,8 +305,6 @@ try:
         if ref.get("ritmos"): tags_ref.append(f"⏱️ {ref['ritmos'][0]}")
         if ref.get("tonos"): tags_ref.append(f"🎭 {ref['tonos'][0]}")
         if ref.get("narradores"): tags_ref.append(f"🗣️ {ref['narradores'][0]}")
-        
-        # AQUI TAMBIÉN AÑADIMOS LA BANDERA SI ES INGLÉS EN EL ESCAPARATE
         if ref.get("es_ingles"): tags_ref.append("🇬🇧 Inglés")
             
         if tags_ref: st.caption(" | ".join(tags_ref))
