@@ -68,9 +68,7 @@ DATABASE_ID = st.secrets["database_id"]
 
 # --- FUNCIONES DE EXTRACCIÓN DE NOTION ---
 def obtener_titulo(prop):
-    try:
-        titulo_real = prop["title"][0]["plain_text"]
-        return titulo_real if titulo_real.strip() else "Sin título"
+    try: return prop["title"][0]["plain_text"] if prop["title"][0]["plain_text"].strip() else "Sin título"
     except: return "Sin título"
 
 def obtener_estado(prop):
@@ -153,7 +151,7 @@ def formato_mensaje(rec):
     else:
         mensaje = f"Prueba con **{rec['titulo']}**, de {rec['autor_texto']}."
         
-    if rec['saga_texto']:
+    if rec.get('saga_texto'):
         num = rec['numero_saga']
         num_texto = f" (Libro {int(float(num))})" if (num and str(num).replace('.','',1).isdigit()) else ""
         mensaje += f" \n*Pertenece a {rec['saga_texto']}{num_texto}*"
@@ -191,7 +189,6 @@ def mostrar_popup(libro, titular, mensaje_extra=""):
         st.markdown(formato_mensaje(libro))
         if mensaje_extra: st.info(f"✨ {mensaje_extra}")
             
-        # ESTE ES EL ORDEN EXACTO QUE ME HAS PEDIDO: RITMO -> TONO -> NARRADOR -> INGLÉS
         tags = []
         if libro.get("ritmos"): tags.append(f"⏱️ {libro['ritmos'][0]}")
         if libro.get("tonos"): tags.append(f"🎭 {libro['tonos'][0]}")
@@ -278,8 +275,68 @@ try:
     candidatos = pendientes + por_terminar
     
     st.subheader("🎯 Tu punto de partida")
-    libro_elegido = st.selectbox("Elige el último libro que te encantó:", leidos)
-    ref = diccionario_libros[libro_elegido]
+    
+    # === SISTEMA DE LIBRO FANTASMA ===
+    modo_busqueda = st.radio("¿Qué libro quieres usar como referencia?", ["De mi estantería (Notion)", "Buscar cualquier libro del mundo 👻"], horizontal=True)
+    
+    ref = None
+    if modo_busqueda == "De mi estantería (Notion)":
+        libro_elegido = st.selectbox("Elige el último libro que te encantó:", leidos)
+        ref = diccionario_libros[libro_elegido]
+    else:
+        col_in, col_btn = st.columns([3, 1])
+        with col_in:
+            libro_fantasma_input = st.text_input("Escribe el Título y Autor del libro:")
+        with col_btn:
+            st.markdown("<br>", unsafe_allow_html=True)
+            buscar_f = st.button("🪄 Invocar")
+            
+        if buscar_f and libro_fantasma_input:
+            with st.spinner("🧠 Consultando la biblioteca mundial..."):
+                try:
+                    genai.configure(api_key=st.secrets["gemini_api_key"])
+                    model = genai.GenerativeModel('gemini-3.5-flash-lite')
+                    prompt_fantasma = f"""
+                    Crea un perfil de metadatos literarios para el libro: "{libro_fantasma_input}".
+                    Usa EXACTAMENTE los valores de estas listas para encajar en el sistema:
+                    - ritmos: Elige 1 de [Denso, Lento, Fluido, Rápido, Adictivo]
+                    - tonos: Elige 1 de [Tenso, Intrigante, Divertido, Emotivo, Épico, Cozy, Oscuro, Acogedor]
+                    - colores: Elige 1 o 2 de [Marrón, Rosa, Negro, Blanco, Naranja, Amarillo, Verde, Azul, Rojo, Carbón, Gris pizarra, Marfil, Púrpura, Índigo, Cia, Azul Marino, Verde Bosque, Esmeralda, Mostaza, Cobre, Granate, Carmesí, Cian, Gris, Dorado, Morado, Plateado]
+                    - narradores: Elige 1 de [Primera Persona, Tercera Persona, Coral, Desconocido]
+                    
+                    Devuelve SOLO un JSON válido con esta estructura:
+                    {{"titulo": "Título Real", "autor_texto": "Autor Real", "descripcion": "Sinopsis breve del libro.", "ritmos": ["..."], "tonos": ["..."], "colores": ["..."], "narradores": ["..."], "es_ingles": true}}
+                    (Pon es_ingles true si el idioma original del libro es el inglés).
+                    """
+                    res = model.generate_content(prompt_fantasma, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+                    datos_f = json.loads(res.text)
+                    
+                    st.session_state["ref_fantasma"] = {
+                        "titulo": datos_f.get("titulo", libro_fantasma_input),
+                        "autor_texto": datos_f.get("autor_texto", "Autor Desconocido"),
+                        "saga_texto": "",
+                        "numero_saga": None,
+                        "colores": datos_f.get("colores", []),
+                        "ritmos": datos_f.get("ritmos", []),
+                        "tonos": datos_f.get("tonos", []),
+                        "narradores": datos_f.get("narradores", []),
+                        "generos": [], 
+                        "autores_ids": [],
+                        "descripcion": datos_f.get("descripcion", ""),
+                        "portada_url": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=300&q=80",
+                        "es_por_terminar": False,
+                        "es_ingles": datos_f.get("es_ingles", False),
+                        "es_fantasma": True
+                    }
+                except Exception as e:
+                    st.error(f"❌ Error invocando al libro fantasma: {e}")
+                    
+        if "ref_fantasma" in st.session_state:
+            ref = st.session_state["ref_fantasma"]
+            st.success("👻 ¡Libro cargado en tu mente! Ya puedes pedir recomendaciones abajo.")
+        else:
+            st.info("Escribe un libro y dale a 'Invocar' para generar su aura.")
+            st.stop()
     
     # === EL ESCAPARATE ===
     st.markdown("<br>", unsafe_allow_html=True)
@@ -298,7 +355,8 @@ try:
             st.info("🖼️ Sin portada")
             
     with esc_col2:
-        st.markdown(f"## {ref['titulo']}")
+        titulo_display = f"👻 {ref['titulo']}" if ref.get("es_fantasma") else ref['titulo']
+        st.markdown(f"## {titulo_display}")
         st.markdown(f"**✍️ {ref['autor_texto']}**")
         
         tags_ref = []
@@ -310,7 +368,7 @@ try:
         if tags_ref: st.caption(" | ".join(tags_ref))
             
         if ref.get("descripcion"):
-            with st.expander("📖 Leer sinopsis completa"):
+            with st.expander("📖 Leer sinopsis"):
                 st.write(ref["descripcion"])
             
     st.markdown("<br>", unsafe_allow_html=True)
@@ -324,8 +382,8 @@ try:
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             if st.button("🔮 Mismo género", use_container_width=True):
-                g_ref, a_ref = set(ref["generos"]), set(ref["autores_ids"])
-                if not g_ref: st.warning("Sin géneros asignados.")
+                g_ref, a_ref = set(ref.get("generos", [])), set(ref.get("autores_ids", []))
+                if not g_ref or ref.get("es_fantasma"): st.warning("Para libros fantasma esta opción no está disponible. Usa el Oráculo.")
                 else:
                     cands = [p for p in candidatos if not set(p["autores_ids"]).intersection(a_ref)]
                     exactas = [p for p in cands if set(p["generos"]) == g_ref]
@@ -339,15 +397,19 @@ try:
 
         with col2:
             if st.button("✍️ Mismo autor", use_container_width=True):
-                opciones = [p for p in candidatos if set(p["autores_ids"]).intersection(set(ref["autores_ids"]))]
-                if opciones: mostrar_popup(random.choice(opciones), "Siguiendo con su pluma:")
-                else: st.warning("No te quedan libros pendientes de este autor.")
+                if ref.get("es_fantasma"): st.warning("Opción no disponible en libros fantasma.")
+                else:
+                    opciones = [p for p in candidatos if set(p["autores_ids"]).intersection(set(ref["autores_ids"]))]
+                    if opciones: mostrar_popup(random.choice(opciones), "Siguiendo con su pluma:")
+                    else: st.warning("No te quedan libros pendientes de este autor.")
 
         with col3:
             if st.button("🔄 Cambio radical", use_container_width=True):
-                opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
-                if opciones: mostrar_popup(random.choice(opciones), "Rompe con todo:")
-                else: st.warning("¡Añade más variedad a tus pendientes!")
+                if ref.get("es_fantasma"): st.warning("Opción no disponible en libros fantasma.")
+                else:
+                    opciones = [p for p in candidatos if not any(g in p["generos"] for g in ref["generos"])]
+                    if opciones: mostrar_popup(random.choice(opciones), "Rompe con todo:")
+                    else: st.warning("¡Añade más variedad a tus pendientes!")
                 
         with col4:
             if st.button("🇬🇧 En Inglés", use_container_width=True):
@@ -361,7 +423,7 @@ try:
         
         with col5:
             if st.button("🔗 Continuar Saga", use_container_width=True):
-                if not ref.get("saga_texto"): st.warning("No pertenece a ninguna saga.")
+                if not ref.get("saga_texto") or ref.get("es_fantasma"): st.warning("No pertenece a ninguna saga registrada.")
                 else:
                     opciones = [p for p in candidatos if p.get("saga_texto") == ref.get("saga_texto") and p.get("numero_saga") is not None]
                     if opciones:
@@ -371,10 +433,12 @@ try:
                         
         with col6:
             if st.button("📚 Saga Similar", use_container_width=True):
-                cands_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(set(ref["generos"]).intersection(set(p["generos"]))) >= 1]
-                opciones = primeras_de_saga(cands_saga)
-                if opciones: mostrar_popup(random.choice(opciones), "Empieza una nueva aventura:")
-                else: st.warning("No hay nuevas sagas de este género listas para empezar.")
+                if ref.get("es_fantasma"): st.warning("Opción no disponible en libros fantasma.")
+                else:
+                    cands_saga = [p for p in candidatos if p.get("saga_texto") and p.get("saga_texto") != ref.get("saga_texto") and len(set(ref["generos"]).intersection(set(p["generos"]))) >= 1]
+                    opciones = primeras_de_saga(cands_saga)
+                    if opciones: mostrar_popup(random.choice(opciones), "Empieza una nueva aventura:")
+                    else: st.warning("No hay nuevas sagas de este género listas para empezar.")
 
         with col7:
             if st.button("🎨 Buscar por Color", use_container_width=True):
@@ -390,11 +454,11 @@ try:
                     if not cands_validos: cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
                     if not cands_validos: st.warning("No tienes pendientes con descripción para analizar.")
                     else:
-                        with st.spinner("🧠 Gemini está analizando..."):
+                        with st.spinner("🧠 Gemini está analizando atmósferas..."):
                             try:
                                 genai.configure(api_key=st.secrets["gemini_api_key"])
                                 model = genai.GenerativeModel('gemini-3.5-flash-lite')
-                                prompt = f"LIBRO: {ref['titulo']}\nSINOPSIS: {ref['descripcion']}\nCANDIDATOS:\n"
+                                prompt = f"LIBRO REFERENCIA: {ref['titulo']}\nSINOPSIS REFERENCIA: {ref['descripcion']}\nCANDIDATOS:\n"
                                 for i, c in enumerate(cands_validos): prompt += f"[{i}] {c['titulo']}\nSinopsis: {c['descripcion']}\n"
                                 prompt += 'Devuelve JSON: {"indice": int, "explicacion": "texto"}'
                                 res = model.generate_content(prompt, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
@@ -409,9 +473,11 @@ try:
         col9, col10, col11, col12 = st.columns(4)
         with col9:
             if st.button("🩸 Sangre Nueva", use_container_width=True):
-                opciones = [p for p in candidatos if not any(a_id in autores_leidos_ids for a_id in p["autores_ids"])]
-                if opciones: mostrar_popup(random.choice(opciones), "Explora nuevos horizontes:")
-                else: st.warning("¡Ya has leído a todos tus autores pendientes!")
+                if ref.get("es_fantasma"): st.warning("Opción no disponible en libros fantasma.")
+                else:
+                    opciones = [p for p in candidatos if not any(a_id in autores_leidos_ids for a_id in p["autores_ids"])]
+                    if opciones: mostrar_popup(random.choice(opciones), "Explora nuevos horizontes:")
+                    else: st.warning("¡Ya has leído a todos tus autores pendientes!")
         with col10:
             if st.button("🎲 Ruleta Rusa", use_container_width=True):
                 if candidatos: mostrar_popup(random.choice(candidatos), "La suerte está echada:")
@@ -450,8 +516,8 @@ try:
         st.markdown("<br>", unsafe_allow_html=True)
         cx1, cx2, cx3 = st.columns(3)
         with cx1:
-            f_genero = st.checkbox("🔮 Mismo género")
-            f_autor = st.checkbox("✍️ Mismo autor")
+            f_genero = st.checkbox("🔮 Mismo género", disabled=ref.get("es_fantasma", False))
+            f_autor = st.checkbox("✍️ Mismo autor", disabled=ref.get("es_fantasma", False))
         with cx2:
             f_ritmo = st.checkbox("⏱️ Mismo ritmo")
             f_tono = st.checkbox("🎭 Mismo tono")
@@ -465,10 +531,10 @@ try:
         if st.button("🍸 Agitar Coctelera", type="primary"):
             filtrados = candidatos.copy()
             
-            if f_genero:
+            if f_genero and not ref.get("es_fantasma"):
                 g_ref = set(ref["generos"])
                 filtrados = [p for p in filtrados if g_ref.intersection(set(p["generos"]))]
-            if f_autor:
+            if f_autor and not ref.get("es_fantasma"):
                 a_ref = set(ref["autores_ids"])
                 filtrados = [p for p in filtrados if a_ref.intersection(set(p["autores_ids"]))]
             if f_ritmo:
