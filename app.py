@@ -158,6 +158,33 @@ def formato_mensaje(rec):
         mensaje += f" \n*Pertenece a {rec['saga_texto']}{num_texto}*"
     return mensaje
 
+# --- SÚPER BUSCADOR DE PORTADAS EN INTERNET ---
+def obtener_portada_internet(consulta):
+    query = urllib.parse.quote(consulta)
+    # 1. Intentar Google Books (busca en los 3 primeros resultados a ver cuál tiene foto)
+    try:
+        url_gb = f"https://www.googleapis.com/books/v1/volumes?q={query}&maxResults=3"
+        res = requests.get(url_gb, timeout=4).json()
+        if "items" in res:
+            for item in res["items"]:
+                if "imageLinks" in item["volumeInfo"] and "thumbnail" in item["volumeInfo"]["imageLinks"]:
+                    return item["volumeInfo"]["imageLinks"]["thumbnail"].replace("http:", "https:").replace("&edge=curl", "")
+    except: pass
+    
+    # 2. Plan B: Intentar OpenLibrary (Base de datos libre mundial)
+    try:
+        url_ol = f"https://openlibrary.org/search.json?q={query}&limit=3"
+        res = requests.get(url_ol, timeout=4).json()
+        if "docs" in res:
+            for doc in res["docs"]:
+                if "cover_i" in doc:
+                    return f"https://covers.openlibrary.org/b/id/{doc['cover_i']}-L.jpg"
+    except: pass
+    
+    # 3. Si no existe en ningún lado, ponemos la genérica bonita
+    return "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=300&q=80"
+
+
 # --- MAGIA VISUAL: EL POP-UP ---
 @st.dialog("🎉 ¡Aquí tienes tu próxima lectura!")
 def mostrar_popup(libro, titular, mensaje_extra=""):
@@ -295,14 +322,8 @@ try:
         if buscar_f and libro_fantasma_input:
             with st.spinner("🧠 Consultando la biblioteca mundial y buscando la portada..."):
                 try:
-                    # 1. Buscar la portada real en Google Books
-                    portada_real = "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=300&q=80" # Por defecto
-                    try:
-                        gb_url = f"https://www.googleapis.com/books/v1/volumes?q={urllib.parse.quote(libro_fantasma_input)}&maxResults=1"
-                        gb_res = requests.get(gb_url, timeout=5).json()
-                        img_google = gb_res["items"][0]["volumeInfo"]["imageLinks"]["thumbnail"]
-                        portada_real = img_google.replace("http:", "https:").replace("&edge=curl", "") 
-                    except: pass 
+                    # 1. BUSCAR PORTADA ROBUSTA
+                    portada_real = obtener_portada_internet(libro_fantasma_input)
                     
                     # 2. Consultar a Gemini para sacar la "esencia" del libro
                     genai.configure(api_key=st.secrets["gemini_api_key"])
