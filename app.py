@@ -509,3 +509,93 @@ try:
                     opciones = [p for p in candidatos if set(p.get("tonos", [])).intersection(t_ref)]
                     if opciones: mostrar_popup(random.choice(opciones), f"Con la misma vibra ({', '.join(t_ref)}):")
                     else: st.warning("No hay pendientes con este tono.")
+
+        col13, col14, col15, col16 = st.columns(4)
+        with col13:
+            if st.button("🗣️ Mismo Narrador", use_container_width=True):
+                n_ref = set(ref.get("narradores", []))
+                if not n_ref: st.warning("Este libro no tiene Narrador asignado.")
+                else:
+                    opciones = [p for p in candidatos if set(p.get("narradores", [])).intersection(n_ref)]
+                    if opciones: mostrar_popup(random.choice(opciones), f"A través de sus ojos ({', '.join(n_ref)}):")
+                    else: st.warning("No hay pendientes con este narrador.")
+
+    with tab2:
+        st.markdown("### 🍹 La Coctelera Literaria")
+        st.write("Mezcla todas las condiciones que debe cumplir tu próxima lectura basándose en el libro que tienes seleccionado arriba:")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        cx1, cx2, cx3 = st.columns(3)
+        with cx1:
+            f_genero = st.checkbox("🔮 Mismo género", disabled=ref.get("es_fantasma", False))
+            f_autor = st.checkbox("✍️ Mismo autor", disabled=ref.get("es_fantasma", False))
+        with cx2:
+            f_ritmo = st.checkbox("⏱️ Mismo ritmo")
+            f_tono = st.checkbox("🎭 Mismo tono")
+            f_narrador = st.checkbox("🗣️ Mismo narrador")
+        with cx3:
+            f_color = st.checkbox("🎨 Mismo color")
+            f_ingles = st.checkbox("🇬🇧 En inglés")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("🍸 Agitar Coctelera", type="primary"):
+            filtrados = candidatos.copy()
+            
+            if f_genero and not ref.get("es_fantasma"):
+                g_ref = set(ref.get("generos", []))
+                filtrados = [p for p in filtrados if g_ref.intersection(set(p.get("generos", [])))]
+            if f_autor and not ref.get("es_fantasma"):
+                a_ref = set(ref.get("autores_ids", []))
+                filtrados = [p for p in filtrados if a_ref.intersection(set(p.get("autores_ids", [])))]
+            if f_ritmo:
+                r_ref = set(ref.get("ritmos", []))
+                filtrados = [p for p in filtrados if r_ref.intersection(set(p.get("ritmos", [])))]
+            if f_tono:
+                t_ref = set(ref.get("tonos", []))
+                filtrados = [p for p in filtrados if t_ref.intersection(set(p.get("tonos", [])))]
+            if f_narrador:
+                n_ref = set(ref.get("narradores", []))
+                filtrados = [p for p in filtrados if n_ref.intersection(set(p.get("narradores", [])))]
+            if f_color:
+                c_ref = set(ref.get("colores", []))
+                filtrados = [p for p in filtrados if c_ref.intersection(set(p.get("colores", [])))]
+            if f_ingles:
+                filtrados = [p for p in filtrados if p.get("es_ingles", False)]
+                
+            if len(filtrados) > 0:
+                ganador = random.choice(filtrados)
+                mostrar_popup(ganador, "🍹 ¡Aquí tienes tu cóctel!", "Esta mezcla es exactamente lo que pediste.")
+            else:
+                st.error("❌ Vaya, ningún libro pendiente cumple TODAS esas condiciones a la vez. ¡Quita algún ingrediente!")
+
+    with tab3:
+        st.markdown("### 🔮 El Oráculo de Gemini (Mood Reader)")
+        st.write("Olvídate de filtros. Cuéntale a la Inteligencia Artificial cómo te sientes o qué te apetece y ella buscará el libro perfecto.")
+        mood_texto = st.text_input("📝 Escribe aquí tu antojo:")
+        
+        if st.button("✨ Preguntar al Oráculo", type="primary"):
+            if not mood_texto: st.warning("¡Escribe algo en la caja!")
+            else:
+                cands_validos = [p for p in candidatos if p.get("descripcion") and len(p.get("descripcion")) > 20]
+                if not cands_validos: st.warning("No hay pendientes con descripción.")
+                else:
+                    with st.spinner("🔮 El Oráculo está consultando los astros..."):
+                        try:
+                            genai.configure(api_key=st.secrets["gemini_api_key"])
+                            model = genai.GenerativeModel('gemini-3.5-flash-lite')
+                            prompt = f'Deseo: "{mood_texto}"\nCANDIDATOS:\n'
+                            for i, c in enumerate(cands_validos): prompt += f"[{i}] {c['titulo']}\nSinopsis: {c['descripcion']}\n"
+                            prompt += 'JSON: {"indice": int, "explicacion": "texto"}'
+                            
+                            res = model.generate_content(prompt, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+                            res_json = json.loads(res.text)
+                            
+                            if 0 <= int(res_json["indice"]) < len(cands_validos):
+                                ganador = cands_validos[int(res_json["indice"])]
+                                mostrar_popup(ganador, "🔮 El Oráculo ha hablado", res_json["explicacion"])
+                            else: st.error("Índice inválido.")
+                        except Exception as e: st.error(f"Error Gemini: {e}")
+
+except Exception as e:
+    st.error(f"❌ Ups, error al cargar: {e}")
